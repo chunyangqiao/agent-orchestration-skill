@@ -1,5 +1,7 @@
 # Agent Orchestration
 
+**English** | [简体中文](README.zh-CN.md)
+
 A portable multi-agent orchestration skill for Codex, Claude Code, and Kimi Code, with configurable roles and models.
 
 Use focused subagents for exploration, research, implementation, browser work, and independent review. The main agent keeps responsibility for task scope, architecture, integration, and final acceptance, delegating work when independent execution or a fresh context adds value.
