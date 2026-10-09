@@ -1,0 +1,20 @@
+{
+  "crew-kimi-coding-low": {
+    "model": "kimi-for-coding",
+    "effort": "low",
+    "max_context_size": 1048576,
+    "capabilities": ["thinking", "always_thinking", "image_in", "video_in", "tool_use", "dynamically_loaded_tools"]
+  },
+  "crew-kimi-coding-high": {
+    "model": "kimi-for-coding",
+    "effort": "high",
+    "max_context_size": 1048576,
+    "capabilities": ["thinking", "always_thinking", "image_in", "video_in", "tool_use", "dynamically_loaded_tools"]
+  },
+  "crew-kimi-k3-high": {
+    "model": "k3-256k",
+    "effort": "high",
+    "max_context_size": 262144,
+    "capabilities": ["thinking", "always_thinking", "image_in", "tool_use", "dynamically_loaded_tools"]
+  }
+}

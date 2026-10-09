@@ -1,0 +1,30 @@
+{
+  "explorer": {
+    "description": "Read-only discovery of local code, interfaces, configuration, and runtime evidence.",
+    "access": "read-only"
+  },
+  "docs-researcher": {
+    "description": "Read-only verification of external documentation, APIs, and version-specific facts from primary sources.",
+    "access": "read-only"
+  },
+  "browser-debugger": {
+    "description": "Reproduce UI failures in a browser and collect steps, screenshots, console, and network evidence without editing application code.",
+    "access": "read-only"
+  },
+  "executor": {
+    "description": "Localized implementation or artifact production with a fixed scope and deterministic checks.",
+    "access": "workspace-write"
+  },
+  "ui-styler": {
+    "description": "Specified local visual changes on an understood UI, with browser verification.",
+    "access": "workspace-write"
+  },
+  "implementer": {
+    "description": "Complex, bounded multi-file implementation after architecture and acceptance decisions are resolved.",
+    "access": "workspace-write"
+  },
+  "reviewer": {
+    "description": "Independent read-only review of a concrete unresolved risk in a stable artifact.",
+    "access": "read-only"
+  }
+}

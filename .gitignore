@@ -1,0 +1,19 @@
+# Dependencies and local package store
+node_modules/
+.pnpm-store/
+
+# Personal configuration and environment overrides
+/.crew/
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Package-manager logs and test output
+npm-debug.log*
+pnpm-debug.log*
+/coverage/
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db

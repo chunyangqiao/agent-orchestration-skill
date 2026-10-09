@@ -1,0 +1,20 @@
+{
+  "codex": {
+    "explorer": { "model": "gpt-6-luna", "effort": "high" },
+    "docs-researcher": { "model": "gpt-6-luna", "effort": "high" },
+    "browser-debugger": { "model": "gpt-6.1-sol", "effort": "high" },
+    "executor": { "model": "gpt-6-luna", "effort": "high" },
+    "ui-styler": { "model": "gpt-6.1-sol", "effort": "medium" },
+    "implementer": { "model": "gpt-6.1-sol", "effort": "high" },
+    "reviewer": { "model": "gpt-6-astra", "effort": "high" }
+  },
+  "kimi-code": {
+    "explorer": { "model": "crew-kimi-coding-low" },
+    "docs-researcher": { "model": "crew-kimi-coding-high" },
+    "browser-debugger": { "model": "crew-kimi-coding-high" },
+    "executor": { "model": "crew-kimi-coding-low" },
+    "ui-styler": { "model": "crew-kimi-coding-high" },
+    "implementer": { "model": "crew-kimi-k3-high" },
+    "reviewer": { "model": "crew-kimi-k3-high" }
+  }
+}
