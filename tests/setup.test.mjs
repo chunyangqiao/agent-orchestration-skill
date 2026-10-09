@@ -3,8 +3,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
-import { defaultConfig, jsonText, readJson } from '../scripts/lib/config.mjs';
-import { runSetup, SetupCancelled, terminalPrompter } from '../scripts/lib/setup.mjs';
+import {
+  defaultConfig,
+  jsonText,
+  readJson,
+} from '../skills/agent-orchestration/scripts/lib/config.mjs';
+import {
+  runSetup,
+  SetupCancelled,
+  terminalPrompter,
+} from '../skills/agent-orchestration/scripts/lib/setup.mjs';
 import { cli, snapshot, temporary } from './helpers.mjs';
 
 function wizard(t, answers, host = 'codex') {

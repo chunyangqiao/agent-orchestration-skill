@@ -13,6 +13,11 @@ export function assertNodeVersion(version = process.versions.node) {
 
 const HELP = `Agent Orchestration profile configuration — Node.js 22+, no runtime dependencies.
 
+Examples below run from the installed skill directory.
+From the repository root, use pnpm run configure <command> or
+node skills/agent-orchestration/scripts/configure.mjs <command>.
+From another directory, use the absolute path to scripts/configure.mjs.
+
   node scripts/configure.mjs setup [--host HOST] [--scope user|project] [--root PATH] [--config FILE]
   node scripts/configure.mjs bootstrap --host HOST --scope user|project --config FILE [--root PATH] [--preset inherit|recommended] [--apply]
   node scripts/configure.mjs init --host HOST --config FILE [--preset inherit|recommended]

@@ -4,16 +4,19 @@ Use this reference for installation acceptance, routing changes, and meaningful 
 
 ## Static and installation checks
 
-From the skill directory:
+From the source repository root (which contains the development `package.json` and `tests/`):
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm format:check
 pnpm test
 ```
 
+The installed skill contains no development package or test suite. Run its CLI with `node scripts/configure.mjs` from the skill directory, or use the CLI's absolute path from another working directory. Repository shortcuts run from the repository root and target `skills/agent-orchestration/scripts/configure.mjs`.
+
 Exercise each host in a temporary project: initialize a config, render profiles, preview installation, apply it, and run `check`. Verify inherited and explicit models, role subsets, repeat installs, changed local files, removal of disabled managed roles, and preservation of unrelated profiles. Invalid or unsupported configuration must fail explicitly. Run the skill format validator available in the author's environment and check local document links.
 
-Also exercise `bootstrap` for each host without a TTY: preview a missing source config without writes, apply, and independently run `check`. Cover existing custom configs, creation-only presets, invalid source locations, conflicts before config creation, installation rollback, and post-install verification failure. Repeat application must preserve unchanged contents and timestamps. Test an isolated skill copy without `node_modules`; redirect user-scope host directories into temporary paths. A passing `static_check` and `runtime_verified: false` must remain distinct from live acceptance.
+Also exercise `bootstrap` for each host without a TTY: preview a missing source config without writes, apply, and independently run `check`. Cover existing custom configs, creation-only presets, invalid source locations, conflicts before config creation, installation rollback, and post-install verification failure. Repeat application must preserve unchanged contents and timestamps. Copy the complete skill into a temporary directory without repository files, `package.json`, or `node_modules`, then exercise all three hosts from a different working directory. Verify the CLI through a symlinked skill directory, allow a source config in the temporary checkout's root `.crew/`, and reject configs inside the skill or managed Agent directory, including symlink aliases. Redirect user-scope host directories into temporary paths. A passing `static_check` and `runtime_verified: false` must remain distinct from live acceptance.
 
 For the AI installation workflow, inspect the completion evidence: a discoverable complete skill folder, source configuration and target paths, static check results, and a live probe result or exact blocker/next step. Copying the skill alone must be reported as partial. Reuse established choices and collect remaining choices together; do not require the user to run the terminal wizard after asking an agent to install.
 

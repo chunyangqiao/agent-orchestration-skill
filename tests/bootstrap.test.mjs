@@ -2,17 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runBootstrap } from '../scripts/lib/bootstrap.mjs';
+import { runBootstrap } from '../skills/agent-orchestration/scripts/lib/bootstrap.mjs';
 import {
   defaultConfig,
   HOSTS,
   jsonText,
   MANIFEST,
   readJson,
-  ROOT,
-} from '../scripts/lib/config.mjs';
-import { atomicWrite, targetDirectory } from '../scripts/lib/install.mjs';
-import { cli, snapshot, temporary } from './helpers.mjs';
+  SKILL_ROOT,
+} from '../skills/agent-orchestration/scripts/lib/config.mjs';
+import {
+  atomicWrite,
+  targetDirectory,
+} from '../skills/agent-orchestration/scripts/lib/install.mjs';
+import { cli, copySkill, snapshot, temporary } from './helpers.mjs';
 
 function fixture(t, host = 'codex') {
   const root = temporary(t);
@@ -140,11 +143,15 @@ test('invalid existing source and host mismatch leave all files untouched', (t) 
 test('source config cannot live in skill or managed directory, including symlink aliases', (t) => {
   const f = fixture(t);
   const alias = path.join(f.root, 'skill-link');
-  fs.symlinkSync(ROOT, alias, 'dir');
+  const targetAlias = path.join(f.root, 'managed-link');
+  fs.symlinkSync(SKILL_ROOT, alias, 'dir');
+  fs.mkdirSync(f.target, { recursive: true });
+  fs.symlinkSync(f.target, targetAlias, 'dir');
   for (const config of [
-    path.join(ROOT, 'bootstrap-test.json'),
+    path.join(SKILL_ROOT, 'bootstrap-test.json'),
     path.join(f.target, 'choices.json'),
     path.join(alias, 'nested', 'choices.json'),
+    path.join(targetAlias, 'nested', 'choices.json'),
   ]) {
     const before = snapshot(f.root);
     assert.throws(() => runBootstrap({ ...f.options, config, apply: true }), /outside the skill/);
@@ -237,16 +244,61 @@ test('post-install read errors produce diagnostics and a filesystem error exit c
   assert.ok(fs.existsSync(path.join(f.target, MANIFEST)));
 });
 
-test('bootstrap runs from an isolated skill copy without development dependencies', (t) => {
-  const f = fixture(t);
-  const skill = path.join(f.root, 'agent-orchestration');
-  for (const dir of ['scripts', 'assets'])
-    fs.cpSync(path.join(ROOT, dir), path.join(skill, dir), { recursive: true });
-  assert.equal(fs.existsSync(path.join(skill, 'node_modules')), false);
-  const script = path.join(skill, 'scripts/configure.mjs');
-  const preview = JSON.parse(cli(f.root, ['bootstrap', ...f.args], 0, script).stdout);
-  assert.equal(preview.static_check.status, 'not_run');
-  const applied = JSON.parse(cli(f.root, ['bootstrap', ...f.args, '--apply'], 0, script).stdout);
-  assert.equal(applied.static_check.status, 'passed');
-  cli(f.root, ['check', '--config', f.config, '--scope', 'project', '--root', f.root], 0, script);
-});
+for (const host of HOSTS) {
+  test(`${host}: bootstrap runs from a complete isolated skill without development dependencies`, (t) => {
+    const f = fixture(t, host);
+    const skill = path.join(f.root, 'agent-orchestration');
+    const script = copySkill(skill);
+    for (const name of ['package.json', 'tests', 'node_modules']) {
+      assert.equal(fs.existsSync(path.join(skill, name)), false);
+      assert.equal(fs.existsSync(path.join(f.root, name)), false);
+    }
+    const before = snapshot(f.root, true);
+    const preview = JSON.parse(cli(f.root, ['bootstrap', ...f.args], 0, script).stdout);
+    assert.equal(preview.static_check.status, 'not_run');
+    assert.deepEqual(snapshot(f.root, true), before);
+    const applied = JSON.parse(cli(f.root, ['bootstrap', ...f.args, '--apply'], 0, script).stdout);
+    assert.equal(applied.static_check.status, 'passed');
+    cli(f.root, ['check', '--config', f.config, '--scope', 'project', '--root', f.root], 0, script);
+    const installed = snapshot(f.root, true);
+    cli(f.root, ['bootstrap', ...f.args, '--apply'], 0, script);
+    assert.deepEqual(snapshot(f.root, true), installed);
+  });
+
+  test(`${host}: migrated checkout permits root .crew configuration and rejects bundle and managed aliases`, (t) => {
+    const root = temporary(t);
+    const skill = path.join(root, 'skills', 'agent-orchestration');
+    const script = copySkill(skill);
+    const config = path.join(root, '.crew', `${host}.json`);
+    const args = ['--host', host, '--scope', 'project', '--root', root, '--config', config];
+    const before = snapshot(root, true);
+    const preview = JSON.parse(cli(root, ['bootstrap', ...args], 0, script).stdout);
+    assert.equal(preview.source_config.path, config);
+    assert.deepEqual(snapshot(root, true), before);
+    const applied = JSON.parse(cli(root, ['bootstrap', ...args, '--apply'], 0, script).stdout);
+    assert.equal(applied.static_check.status, 'passed');
+    assert.deepEqual(readJson(config), defaultConfig(host));
+    const target = targetDirectory(host, 'project', root);
+    const skillAlias = path.join(root, 'skill-link');
+    const targetAlias = path.join(root, 'managed-link');
+    fs.symlinkSync(skill, skillAlias, 'dir');
+    fs.symlinkSync(target, targetAlias, 'dir');
+    const installed = snapshot(root, true);
+    for (const directory of [skill, skillAlias, target, targetAlias]) {
+      const rejected = cli(
+        root,
+        [
+          'bootstrap',
+          ...args,
+          '--config',
+          path.join(directory, 'nested', 'choices.json'),
+          '--apply',
+        ],
+        2,
+        script,
+      );
+      assert.match(rejected.stderr, /outside the skill and managed Agent directories/);
+      assert.deepEqual(snapshot(root, true), installed);
+    }
+  });
+}

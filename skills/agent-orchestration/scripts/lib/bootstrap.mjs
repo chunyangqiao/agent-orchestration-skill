@@ -7,7 +7,7 @@ import {
   expandPath,
   readJson,
   render,
-  ROOT,
+  SKILL_ROOT,
   validate,
 } from './config.mjs';
 import {
@@ -43,7 +43,7 @@ export function runBootstrap(options, write = atomicWrite) {
     throw new ConfigError(`Unknown preset: ${options.preset}`);
   const target = targetDirectory(options.host, options.scope, options.root);
   const configPath = expandPath(options.config);
-  for (const directory of [ROOT, target]) {
+  for (const directory of [SKILL_ROOT, target]) {
     if (
       contains(directory, configPath) ||
       contains(resolvedPath(directory), resolvedPath(configPath))

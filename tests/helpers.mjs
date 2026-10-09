@@ -2,10 +2,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { ROOT } from '../scripts/lib/config.mjs';
+import { SKILL_ROOT } from '../skills/agent-orchestration/scripts/lib/config.mjs';
 
-export const SCRIPT = path.join(ROOT, 'scripts/configure.mjs');
+export const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
+export const SCRIPT = path.join(SKILL_ROOT, 'scripts/configure.mjs');
+export function copySkill(destination) {
+  fs.cpSync(SKILL_ROOT, destination, { recursive: true });
+  return path.join(destination, 'scripts/configure.mjs');
+}
 export function temporary(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'crew-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

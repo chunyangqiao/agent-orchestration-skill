@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-export const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+export const SKILL_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const HOSTS = ['codex', 'claude-code', 'kimi-code'];
 export const MANIFEST = '.crew-install.json';
 export const RUNTIME = '.crew-runtime.json';
@@ -50,9 +50,9 @@ export function readText(file) {
 }
 export const readJson = (file) => parseJson(readText(file));
 export const jsonText = (value) => JSON.stringify(value, null, 2) + '\n';
-export const catalog = () => readJson(path.join(ROOT, 'assets/roles.json'));
-export const presets = () => readJson(path.join(ROOT, 'assets/presets.json'));
-export const kimiModels = () => readJson(path.join(ROOT, 'assets/kimi-models.json'));
+export const catalog = () => readJson(path.join(SKILL_ROOT, 'assets/roles.json'));
+export const presets = () => readJson(path.join(SKILL_ROOT, 'assets/presets.json'));
+export const kimiModels = () => readJson(path.join(SKILL_ROOT, 'assets/kimi-models.json'));
 export const expandPath = (value) =>
   path.resolve(
     value === '~'
@@ -165,13 +165,13 @@ const flow = (value) =>
 export function render(config) {
   validate(config);
   const { host } = config;
-  const common = readText(path.join(ROOT, 'assets/roles/common.md')).trim();
+  const common = readText(path.join(SKILL_ROOT, 'assets/roles/common.md')).trim();
   const files = {};
   for (const [role, definition] of Object.entries(catalog())) {
     if (!Object.hasOwn(config.roles, role)) continue;
     const options = config.roles[role];
     const name = `crew-${role}`;
-    const body = readText(path.join(ROOT, `assets/roles/${role}.md`)).trim();
+    const body = readText(path.join(SKILL_ROOT, `assets/roles/${role}.md`)).trim();
     const prompt = `${body}\n\n${common}\n`;
     const model = options.model ?? 'inherit';
     const values = { name, description: definition.description };

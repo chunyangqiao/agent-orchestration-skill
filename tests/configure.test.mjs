@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { parse as toml } from 'smol-toml';
 import { parse as yaml } from 'yaml';
-import { assertNodeVersion } from '../scripts/configure.mjs';
+import { assertNodeVersion } from '../skills/agent-orchestration/scripts/configure.mjs';
 import {
   catalog,
   ConfigError,
@@ -19,17 +19,17 @@ import {
   parseJson,
   readJson,
   render,
-  ROOT,
+  SKILL_ROOT,
   RUNTIME,
   validate,
-} from '../scripts/lib/config.mjs';
+} from '../skills/agent-orchestration/scripts/lib/config.mjs';
 import {
   atomicWrite,
   install,
   installationPlan,
   targetDirectory,
-} from '../scripts/lib/install.mjs';
-import { cli, SCRIPT, snapshot, temporary } from './helpers.mjs';
+} from '../skills/agent-orchestration/scripts/lib/install.mjs';
+import { cli, copySkill, REPO_ROOT, SCRIPT, snapshot, temporary } from './helpers.mjs';
 
 function fixture(t, host = 'codex') {
   const root = temporary(t);
@@ -89,9 +89,9 @@ for (const host of HOSTS) {
         assert.equal(parsed.name, `crew-${role}`);
         assert.equal(parsed.description, definition.description);
         const prompt =
-          fs.readFileSync(path.join(ROOT, `assets/roles/${role}.md`), 'utf8').trim() +
+          fs.readFileSync(path.join(SKILL_ROOT, `assets/roles/${role}.md`), 'utf8').trim() +
           '\n\n' +
-          fs.readFileSync(path.join(ROOT, 'assets/roles/common.md'), 'utf8').trim() +
+          fs.readFileSync(path.join(SKILL_ROOT, 'assets/roles/common.md'), 'utf8').trim() +
           '\n';
         if (host === 'codex') {
           assert.equal(parsed.developer_instructions, prompt);
@@ -112,7 +112,7 @@ for (const host of HOSTS) {
   });
 }
 
-for (const old of readJson(path.join(ROOT, 'tests/fixtures/python-v1.json'))) {
+for (const old of readJson(path.join(REPO_ROOT, 'tests/fixtures/python-v1.json'))) {
   test(`Python v1 ${old.host}/${old.variant}: byte parity and installed manifest compatibility`, (t) => {
     const f = fixture(t, old.host);
     f.save(old.config);
@@ -444,16 +444,13 @@ test('custom home paths and CLI argument boundaries', (t) => {
     cli(f.root, args, 2);
 });
 
-test('version gate runs before file writes and runtime works without development packages', (t) => {
+test('version gate runs before file writes', (t) => {
   for (const version of ['20.19.0', '18.0.0', 'invalid'])
     assert.throws(() => assertNodeVersion(version), /requires Node.js 22/);
   for (const version of ['22.0.0', '24.0.0']) assert.doesNotThrow(() => assertNodeVersion(version));
   const root = temporary(t);
   const copy = path.join(root, 'skill');
-  fs.mkdirSync(copy);
-  for (const name of ['scripts', 'assets'])
-    fs.cpSync(path.join(ROOT, name), path.join(copy, name), { recursive: true });
-  const script = path.join(copy, 'scripts/configure.mjs');
+  const script = copySkill(copy);
   const config = path.join(root, 'config.json');
   const result = spawnSync(
     process.execPath,
@@ -467,25 +464,44 @@ test('version gate runs before file writes and runtime works without development
   assert.equal(result.status, 2);
   assert.match(result.stderr, /requires Node.js 22/);
   assert.equal(fs.existsSync(config), false);
-  cli(
-    root,
-    ['init', '--host', 'kimi-code', '--config', config, '--preset', 'recommended'],
-    0,
-    script,
-  );
-  cli(root, ['render', '--config', config], 0, script);
-  cli(
-    root,
-    ['install', '--config', config, '--scope', 'project', '--root', root, '--apply'],
-    0,
-    script,
-  );
-  cli(root, ['check', '--config', config, '--scope', 'project', '--root', root], 0, script);
 });
+
+for (const host of HOSTS) {
+  test(`${host}: complete standalone skill runs init, render and installation without repository dependencies`, (t) => {
+    const root = temporary(t);
+    const skill = path.join(root, 'standalone-skill');
+    const script = copySkill(skill);
+    for (const name of ['package.json', 'tests', 'node_modules']) {
+      assert.equal(fs.existsSync(path.join(skill, name)), false);
+      assert.equal(fs.existsSync(path.join(root, name)), false);
+    }
+    // Run from a separate directory so resource reads cannot depend on cwd.
+    const cwd = path.join(root, 'working-directory');
+    fs.mkdirSync(cwd);
+    const config = path.join(root, 'choices.json');
+    cli(cwd, ['init', '--host', host, '--config', config], 0, script);
+    const source = fs.readFileSync(config);
+    const rendered = JSON.parse(cli(cwd, ['render', '--config', config], 0, script).stdout);
+    assert.deepEqual(rendered.files, render(defaultConfig(host)));
+    const args = ['--config', config, '--scope', 'project', '--root', cwd];
+    const before = snapshot(root, true);
+    const preview = JSON.parse(cli(cwd, ['install', ...args], 0, script).stdout);
+    assert.equal(preview.status, 'pending');
+    assert.deepEqual(snapshot(root, true), before);
+    cli(cwd, ['install', ...args, '--apply'], 0, script);
+    const checked = JSON.parse(cli(cwd, ['check', ...args], 0, script).stdout);
+    assert.equal(checked.status, 'current');
+    assert.equal(checked.runtime_verified, false);
+    const installed = snapshot(root, true);
+    cli(cwd, ['install', ...args, '--apply'], 0, script);
+    assert.deepEqual(snapshot(root, true), installed);
+    assert.deepEqual(fs.readFileSync(config), source);
+  });
+}
 
 test('role catalog and source files match', () => {
   const roles = fs
-    .readdirSync(path.join(ROOT, 'assets/roles'))
+    .readdirSync(path.join(SKILL_ROOT, 'assets/roles'))
     .filter((name) => name.endsWith('.md') && name !== 'common.md')
     .map((name) => name.slice(0, -3));
   assert.deepEqual(roles.sort(), Object.keys(catalog()).sort());
@@ -494,13 +510,20 @@ test('role catalog and source files match', () => {
 test('CLI remains executable through a symlinked skill directory', (t) => {
   const root = temporary(t);
   const link = path.join(root, 'agent-orchestration');
-  fs.symlinkSync(ROOT, link, 'dir');
+  fs.symlinkSync(SKILL_ROOT, link, 'dir');
   const script = path.join(link, 'scripts/configure.mjs');
-  assert.match(
-    cli(root, ['--help'], 0, script).stdout,
-    /Agent Orchestration profile configuration/,
-  );
+  const help = cli(root, ['--help'], 0, script).stdout;
+  assert.match(help, /Agent Orchestration profile configuration/);
+  assert.match(help, /From the repository root, use pnpm run configure/);
+  assert.match(help, /node skills\/agent-orchestration\/scripts\/configure.mjs/);
+  assert.match(help, /From another directory, use the absolute path/);
   const config = path.join(root, 'choices.json');
   cli(root, ['init', '--host', 'codex', '--config', config], 0, script);
   assert.deepEqual(readJson(config), defaultConfig('codex'));
+  const scriptLink = path.join(root, 'configure.mjs');
+  fs.symlinkSync(script, scriptLink);
+  assert.deepEqual(
+    JSON.parse(cli(root, ['render', '--config', config], 0, scriptLink).stdout).files,
+    render(defaultConfig('codex')),
+  );
 });
