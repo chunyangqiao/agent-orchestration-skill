@@ -8,6 +8,11 @@
     "test": "node --test tests/*.test.mjs",
     "configure": "node scripts/configure.mjs",
     "setup": "node scripts/configure.mjs setup",
+    "configure:bootstrap": "node scripts/configure.mjs bootstrap",
+    "configure:init": "node scripts/configure.mjs init",
+    "configure:render": "node scripts/configure.mjs render",
+    "configure:install": "node scripts/configure.mjs install",
+    "configure:check": "node scripts/configure.mjs check",
     "prepare": "husky"
   },
   "keywords": [],

@@ -49,8 +49,10 @@ Clone or download this repository into a folder named `agent-orchestration`, the
 
 ```bash
 node --version
-node scripts/configure.mjs setup
+pnpm run setup
 ```
+
+The shortcuts use the pnpm version declared in `package.json` and do not require `pnpm install`. If pnpm is unavailable, run `node scripts/configure.mjs setup` directly.
 
 The wizard collects the host, installation scope, configuration path, roles, concurrency limit, and model choices. It previews changes and asks for confirmation before writing. Cancel with `cancel`, Ctrl-C, or EOF. Saved configurations remain outside the skill directory so updates preserve your choices.
 
@@ -73,11 +75,11 @@ Invoking the skill alone does not start subagents: provide a concrete task. Smal
 Run from the skill directory. This example previews a Codex user installation, then saves a new configuration if needed, installs profiles, and checks the installed files:
 
 ```bash
-node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit
-node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit --apply
+pnpm run configure:bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit
+pnpm run configure:bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit --apply
 
 # Optional independent recheck later:
-node scripts/configure.mjs check --config ~/.config/crew/codex.json --scope user
+pnpm run configure:check --config ~/.config/crew/codex.json --scope user
 ```
 
 - Use `claude-code` or `kimi-code` with a separate configuration for those hosts.
@@ -87,7 +89,31 @@ node scripts/configure.mjs check --config ~/.config/crew/codex.json --scope user
 - Preview creates no files or directories. `--apply` writes only the source configuration and managed profiles. Keep the source outside the skill and managed Agent directories. Bootstrap does not copy the skill itself.
 - The JSON result identifies configuration creation/reuse and static check status. `runtime_verified: false` means live host loading and execution still need verification, even after static checks pass.
 
-The individual `init`, `render`, `install`, and `check` commands remain available for [step-by-step configuration](references/configuration.md#step-by-step-commands). The `setup` wizard remains available for interactive terminal use.
+### Command shortcuts
+
+Run these scripts from the skill directory. Arguments after the script name are forwarded to the CLI; no extra `--` separator is needed with `pnpm run`.
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm run setup` | Interactive configuration and installation wizard |
+| `pnpm run configure --help` | Show CLI commands and options |
+| `pnpm run configure:bootstrap` | Preview configuration and profiles; add `--apply` to save, install, and check |
+| `pnpm run configure:init` | Create a source configuration; refuses an existing file |
+| `pnpm run configure:render` | Display generated profiles without installing them |
+| `pnpm run configure:install` | Preview profile changes; add `--apply` to write them |
+| `pnpm run configure:check` | Compare installed profiles with the source configuration |
+
+For separate initialization and installation steps, use a new configuration path:
+
+```bash
+pnpm run configure:init --host codex --config ~/.config/crew/codex.json --preset inherit
+pnpm run configure:render --config ~/.config/crew/codex.json
+pnpm run configure:install --config ~/.config/crew/codex.json --scope user
+pnpm run configure:install --config ~/.config/crew/codex.json --scope user --apply
+pnpm run configure:check --config ~/.config/crew/codex.json --scope user
+```
+
+After editing a saved configuration, repeat the render, preview, apply, and check steps. A successful check verifies installed files, not live host loading or execution. See [step-by-step configuration](references/configuration.md#step-by-step-commands) for scope and conflict rules. All direct `node scripts/configure.mjs <command>` commands remain supported.
 
 Agent Orchestration was previously named Crew. Existing `crew-*` profile and model alias names, state files, and configuration paths are retained for installation compatibility. See [configuration](references/configuration.md) for the JSON schema, scopes, conflict handling, and updates.
 
