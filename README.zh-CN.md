@@ -155,7 +155,7 @@ pnpm format:check
 pnpm test
 ```
 
-使用 `pnpm format` 格式化脚本和测试。在 Git 检出目录中，Husky 的 pre-commit 钩子会格式化暂存的脚本并运行测试套件。
+使用 `pnpm format` 格式化脚本和测试。使用 `pnpm lint-staged` 通过 Oxfmt 格式化暂存的 `.mjs`、JSON 和 YAML 文件，排除锁文件和旧版测试夹具。在 Git 检出目录中，`pnpm prepare` 会启用 Husky 的 pre-commit 钩子，依次执行 `pnpm lint-staged` 和 `pnpm test`。
 
 测试覆盖配置校验、角色配置生成、引导安装预览及安装后检查、安装冲突、幂等性、回滚、向导取消，以及与保存的旧版测试夹具的兼容性。测试也会验证不依赖开发依赖的运行命令。宿主实际运行验收见[评估文档](skills/agent-orchestration/references/evaluation.md)，贡献指南见 [AGENTS.md](AGENTS.md)。
 

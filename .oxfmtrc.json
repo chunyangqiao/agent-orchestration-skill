@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": ["pnpm-lock.yaml", "tests/fixtures/**"],
   "singleQuote": true,
   "tabWidth": 2,
   "printWidth": 100
