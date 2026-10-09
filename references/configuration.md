@@ -2,11 +2,44 @@
 
 Agent Orchestration has one portable workflow, seven shared role definitions, and host-specific profile generation. Installation and configuration require Node.js 22+ (24 LTS recommended), with no third-party runtime packages or build step. The helper configures profiles; the host performs actual agent execution.
 
-## First setup
+## AI-driven installation
 
-Install the skill folder as `agent-orchestration` and invoke it with `$agent-orchestration`.
+Use this workflow when the user asks an agent to install or set up Agent Orchestration. A complete installation request includes skill deployment and profile configuration unless the user explicitly limits the request to copying the skill. During an ordinary work request, report missing installation requirements without making unrequested setup changes.
 
-Check `node --version` before starting. If Node.js is absent or older than 22, install a supported version from [nodejs.org](https://nodejs.org/) first. The CLI also rejects unsupported versions before reading configuration or writing files. Copying a skill folder does not perform this check or configure any profiles; setup is complete only after configuration, installation, and host verification.
+1. **Inspect.** Identify the host from its runtime and tools, read its adapter, and run `node --version`. Node.js 22+ is required; if unavailable, report the prerequisite and [installation source](https://nodejs.org/). Inspect the requested scope's existing source configuration, `.crew-runtime.json`, and profiles before choosing defaults. Project installation takes precedence over user installation as one complete configuration.
+2. **Collect choices together.** Reuse choices already supplied by the user. Ask once for unresolved installation scope (user or project) and model strategy (inherit, a supported recommended preset, or custom choices). Include all seven roles and three active children as the proposed defaults; collect any role/concurrency adjustments in the same exchange. Derive the host and actual project root from available evidence. Suggest a source path outside the skill and managed Agent directories: `~/.config/crew/<host>.json` for user scope or `<project>/.crew/<host>.json` for project scope. Preserve existing choices instead of replacing them with defaults. If only an applied runtime configuration remains, use it to recover the user's source configuration rather than selecting a new preset.
+3. **Deploy the skill.** Make the complete folder discoverable as `agent-orchestration` through the host's skill mechanism, including scripts, references, and assets. Inspect an existing skill installation before updating it; preserve local modifications and respect the requested scope. Copying this folder is only the deployment stage.
+4. **Configure and install.** Use the installed skill's absolute CLI path. For preset-based setup, `bootstrap` can create the external source config. For custom choices, prepare a source JSON using the contract below, preserving an existing file unless its changes were requested. Run `bootstrap` without `--apply` and inspect the resolved configuration and file changes, then rerun with `--apply` within the user's installation authorization. Do not ask again for already-authorized routine steps. Inspect the exit code and `static_check`; resolve conflicts explicitly without overwriting local edits. The interactive `setup` wizard is for a human terminal, not this workflow.
+5. **Verify and report.** When the live host exposes the installed role selector, run one bounded read-only probe with an enabled role and verify its result and available host metadata using [live host acceptance](evaluation.md#live-host-acceptance). If profiles need a fresh session, the tool cannot select `crew-*`, or model/tool access is unavailable, state the exact blocker and next step. Do not substitute a generic child and claim the configured role was verified. Report **skill deployment**, **static profile checks**, and **live subagent verification** separately; copying alone is partial installation, and static success with a blocked probe means installed files with runtime verification pending.
+
+Model authentication and Kimi model-pool setup remain host tasks. Do not silently change a selected model to make verification pass. A completed setup does not force delegation for every task; invoking the skill alone provides no work to delegate.
+
+## Bootstrap command
+
+Run from the deployed skill directory, or use its absolute CLI path:
+
+```bash
+node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit
+node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit --apply
+```
+
+`--host`, `--scope`, and `--config` are required. Project scope also requires `--root /path/to/project`; user scope rejects `--root`. Without `--apply`, bootstrap renders and plans in memory without creating files or directories. It does not download or deploy the skill.
+
+For new configs, `--preset` defaults to `inherit`; `recommended` is available for Codex and Kimi. Existing configs are validated and reused byte-for-byte, even when a preset is supplied; the report explicitly says the preset was not applied. Host mismatches and invalid configurations fail without writes. Custom roles, models, and concurrency use the source JSON contract, not additional CLI overrides. Source configs must be regular files outside both the skill folder and managed Agent directory, including paths reached through symlinks.
+
+On apply, conflicts prevent saving a new config. Bootstrap uses the existing installer's rollback on write failure and removes only a source config created by that invocation. Incomplete rollback or cleanup names the remaining files. After installation it rereads the source and installed state; a mismatch or read error leaves the artifacts available for diagnosis and returns nonzero. Repeat applications preserve unchanged files and timestamps. Installation remains single-writer and is not crash-atomic.
+
+The JSON output retains the installation report (`target`, `status`, `changes`, `runtime_verified`, and optional `host_setup`) and adds:
+
+| Field | Meaning |
+| --- | --- |
+| `source_config` | Absolute `path`, `action` (`create` in a preview, `created` after saving, or `reuse`), creation `preset` or `null` for reuse, and an explanatory `note` |
+| `configuration` | Resolved host, roles/models, and maximum active children |
+| `static_check` | `status`: `not_run`, `passed`, or `failed`; completed comparisons include `source_matches` and post-install `changes`; read/validation failures include `error` |
+
+`runtime_verified` is always `false`: the CLI cannot establish host loading or real execution. Exit codes are `0` for a conflict-free preview or an application with passing static checks, `1` for conflicts or a post-install mismatch, and `2` for invalid input or filesystem errors. A successful apply has `status: applied`; failed verification reports `pending`, `conflict`, or `error` with the static diagnostics. Preview/reuse does not imply a completed post-install check.
+
+## Terminal wizard
 
 For direct terminal use, run the numbered wizard:
 
@@ -16,7 +49,9 @@ node scripts/configure.mjs setup
 
 It asks for host, scope, configuration path, enabled roles, maximum active children, and model choices. All seven roles and three children are the defaults. Codex/Kimi offer accepting the recommendation, adjusting selected roles, customizing every enabled role, or inheriting host defaults. Claude offers inherit/customize. Model IDs can be entered directly; Kimi uses model-pool aliases that also determine effort. The final step previews role choices and file changes before saving and installing. Type `cancel`, press Ctrl-C, send EOF, or decline the final confirmation to exit without writes. Existing config files can be used unchanged or a new path selected; the wizard never overwrites them.
 
-An Agent should ask only for choices not already established in the conversation, then use the non-interactive commands below. `setup` requires a terminal and fails immediately when one is unavailable. The wizard also accepts `--host`, `--scope`, `--root`, and `--config` to skip established choices. A project setup needs the actual project root, not an arbitrary working subdirectory.
+`setup` requires a terminal and fails immediately when one is unavailable. The wizard also accepts `--host`, `--scope`, `--root`, and `--config` to skip established choices. A project setup needs the actual project root, not an arbitrary working subdirectory. Agents use the AI-driven workflow above.
+
+## Step-by-step commands
 
 Use the absolute path to this skill's `scripts/configure.mjs` when outside the skill directory. These examples assume the installed skill directory:
 

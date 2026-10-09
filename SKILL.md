@@ -1,20 +1,25 @@
 ---
 name: agent-orchestration
-description: Coordinate substantial tasks with focused subagents across supported agent hosts, or configure Agent Orchestration roles and model choices. Use when parallel independent work, context isolation, or fresh review materially helps; keep small or tightly coupled tasks in the main conversation.
+description: Install or configure Agent Orchestration, or coordinate substantial tasks with focused subagents across supported agent hosts. Use when parallel independent work, context isolation, or fresh review materially helps; keep small or tightly coupled tasks in the main conversation.
 ---
 
 # Agent Orchestration
 
 Keep the main agent responsible for user intent, architecture, scope, integration, and final acceptance. Delegate independently finishable work when the benefit repays briefing, waiting, and review.
 
+## Installation requests
+
+For an installation or setup request, follow [AI-driven installation](references/configuration.md#ai-driven-installation) through skill deployment, profile installation, and verification. Collect unresolved choices together, then complete authorized steps without asking again. Copying the skill folder alone is partial installation; report static checks and live host verification separately.
+
 ## Select the environment
 
 1. Identify the **host** from its runtime and exposed tools, independently of the model provider. Claude Code running GLM still uses the Claude Code adapter. Model names alone do not identify a host.
 2. Read only the matching adapter: [Codex](references/hosts/codex.md), [Claude Code](references/hosts/claude-code.md), or [Kimi Code](references/hosts/kimi-code.md). Use its installed `.crew-runtime.json` and verify the named profiles are available through the live host. Project installation takes precedence over user installation; use one complete Agent Orchestration configuration, without merging scopes.
-3. For installation, customization, configuration conflicts, or missing profiles, read [configuration](references/configuration.md). Check Node.js 22+ before setup. Collect installation choices in conversation and use the non-interactive CLI; the numbered `setup` wizard is for a user's terminal. Installation and model authentication are separate from ordinary task execution. Apply configuration only within the user's requested setup scope.
+3. For customization, configuration conflicts, or missing profiles, read [configuration](references/configuration.md). During ordinary task execution, report missing configuration and the next setup step; install only when the user has requested setup. Model authentication remains in the host.
 4. If the host cannot create real subagents, a required profile is unavailable, or a model/tool choice cannot be honored, explain the limitation and keep the affected work in the main conversation. Do not describe sequential role-playing as parallel or independent review. A future host needs an explicit adapter and verification before being claimed as supported.
 
 When actually delegating, briefly announce Agent Orchestration in the user's language and state the useful work split. For a simple task, work directly without a ceremonial team launch.
+Invoking the skill without a concrete task does not itself start subagents.
 
 ## Route by responsibility
 

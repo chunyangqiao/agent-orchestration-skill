@@ -14,6 +14,7 @@ export function assertNodeVersion(version = process.versions.node) {
 const HELP = `Agent Orchestration profile configuration — Node.js 22+, no runtime dependencies.
 
   node scripts/configure.mjs setup [--host HOST] [--scope user|project] [--root PATH] [--config FILE]
+  node scripts/configure.mjs bootstrap --host HOST --scope user|project --config FILE [--root PATH] [--preset inherit|recommended] [--apply]
   node scripts/configure.mjs init --host HOST --config FILE [--preset inherit|recommended]
   node scripts/configure.mjs render --config FILE
   node scripts/configure.mjs install --config FILE --scope user|project [--root PATH] [--apply]
@@ -23,6 +24,9 @@ Hosts: codex, claude-code, kimi-code. Project scope requires --root.
 init refuses existing files; inherit is the default preset. No Claude recommended preset.
 setup uses a numbered terminal wizard; agents should collect choices in conversation.
 install previews by default; --apply writes profiles. Kimi model-pool setup stays manual.
+bootstrap previews without writes; --apply saves new config, installs and checks profiles.
+Existing bootstrap configs are reused unchanged; preset applies only to new configs.
+Static checks do not verify live host loading or subagent execution.
 Exit codes: 0 success/cancel, 1 conflict or non-current check, 2 invalid input/filesystem error.
 `;
 
@@ -64,6 +68,7 @@ export async function main(argv = process.argv.slice(2)) {
     }
     const [command] = parsed.positionals;
     const allowed = {
+      bootstrap: ['host', 'config', 'scope', 'root', 'preset', 'apply'],
       init: ['host', 'config', 'preset'],
       render: ['config'],
       install: ['config', 'scope', 'root', 'apply'],
@@ -72,7 +77,7 @@ export async function main(argv = process.argv.slice(2)) {
     };
     if (!Object.hasOwn(allowed, command ?? '') || parsed.positionals.length !== 1)
       throw new ConfigError(
-        'Expected one command: init, render, install, check or setup. Use --help.',
+        'Expected one command: init, render, install, check, setup or bootstrap. Use --help.',
       );
     for (const key of Object.keys(options)) {
       if (!allowed[command].includes(key))
@@ -88,6 +93,12 @@ export async function main(argv = process.argv.slice(2)) {
       return await runSetup(options, io);
     }
     if (!options.config) throw new ConfigError('--config is required');
+    if (command === 'bootstrap') {
+      const { runBootstrap } = await import('./lib/bootstrap.mjs');
+      const { result, exitCode } = runBootstrap(options);
+      process.stdout.write(jsonText(result));
+      return exitCode;
+    }
     const configPath = expandPath(options.config);
     if (command === 'init') {
       if (!options.host) throw new ConfigError('--host is required');

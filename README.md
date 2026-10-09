@@ -8,7 +8,7 @@ Use focused subagents for exploration, research, implementation, browser work, a
 
 - Seven shared roles with host-specific native profiles.
 - Configurable role selection, models, supported reasoning levels, and concurrency guidance.
-- Interactive setup and a dependency-free configuration CLI.
+- AI-driven installation, a non-interactive bootstrap command, and an interactive terminal wizard.
 - Installation previews, conflict detection, and repeatable updates that preserve unrelated profiles and locally edited managed files.
 
 The host runs the agents and controls their permissions. This skill provides coordination instructions and profile generation; model authentication and tool access are configured in the host.
@@ -25,15 +25,27 @@ Kimi support targets the Markdown Agent format described in its adapter. Model a
 
 ## Quick start
 
-### 1. Add the skill
+### Install with an AI agent
 
-Clone or download this repository into a folder named `agent-orchestration`, then make that folder discoverable through your host's skill installation mechanism. Keep the whole folder: `SKILL.md` references the bundled scripts, role definitions, and host adapters.
+Give your agent the repository URL or local checkout path and this request:
+
+```text
+Install Agent Orchestration from this repository for my current agent host.
+Read SKILL.md and follow the AI-driven installation guide in references/configuration.md.
+Inspect existing choices and ask once for unresolved scope and model choices,
+showing the default roles and concurrency. Then deploy the complete skill,
+preview and apply the profiles, and verify the installation.
+Report skill deployment, static profile checks, and live subagent verification
+separately; if live verification is blocked, give the exact next step.
+```
+
+The agent completes the authorized installation using the non-interactive CLI. It should not stop after copying the skill folder or hand you the terminal wizard to finish the remaining setup. See [AI-driven installation](references/configuration.md#ai-driven-installation) for the complete workflow.
 
 The configuration CLI requires **Node.js 22+**; Node.js 24 LTS is recommended. Runtime commands need no package installation or build step.
 
-### 2. Configure agent profiles
+### Manual installation
 
-From the skill directory, run this in your terminal:
+Clone or download this repository into a folder named `agent-orchestration`, then make the complete folder discoverable through your host's skill installation mechanism. From that folder, run the terminal wizard:
 
 ```bash
 node --version
@@ -42,9 +54,9 @@ node scripts/configure.mjs setup
 
 The wizard collects the host, installation scope, configuration path, roles, concurrency limit, and model choices. It previews changes and asks for confirmation before writing. Cancel with `cancel`, Ctrl-C, or EOF. Saved configurations remain outside the skill directory so updates preserve your choices.
 
-For agent-driven setup, use the non-interactive commands below. Installing profiles and making the skill discoverable are separate steps.
+Alternatively, use the bootstrap command below. Making the skill discoverable and installing its agent profiles are both required.
 
-### 3. Use the skill
+### Use the skill
 
 After the host discovers the skill and installed profiles, invoke it with a bounded task, for example:
 
@@ -54,23 +66,28 @@ where useful, preserve existing behavior, and verify the result before finishing
 ```
 
 Start a fresh session if the host has not loaded the profiles yet. Confirm the selected models and available tools with a small task before relying on a new setup.
+Invoking the skill alone does not start subagents: provide a concrete task. Small or tightly coupled tasks can stay in the main conversation.
 
-## Non-interactive setup
+## Bootstrap profiles
 
-This example creates a Codex configuration using inherited host model defaults, previews the generated profiles, and installs them for the current user. Run it from the skill directory and choose an unused configuration filename:
+Run from the skill directory. This example previews a Codex user installation, then saves a new configuration if needed, installs profiles, and checks the installed files:
 
 ```bash
-node scripts/configure.mjs init --host codex --config ~/.config/crew/codex.json
-node scripts/configure.mjs render --config ~/.config/crew/codex.json
-node scripts/configure.mjs install --config ~/.config/crew/codex.json --scope user
-node scripts/configure.mjs install --config ~/.config/crew/codex.json --scope user --apply
+node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit
+node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit --apply
+
+# Optional independent recheck later:
 node scripts/configure.mjs check --config ~/.config/crew/codex.json --scope user
 ```
 
 - Use `claude-code` or `kimi-code` with a separate configuration for those hosts.
-- For a project installation, use `--scope project --root /path/to/project` on both `install` and `check`.
-- Add `--preset recommended` to `init` for the bundled Codex or Kimi starting choices. Check model access before using them. Recommended Kimi aliases require manual model-pool setup described in the [Kimi adapter](references/hosts/kimi-code.md#recommended-model-pool).
-- `init` refuses to overwrite a configuration. `install` previews changes unless `--apply` is present. `check` compares installed files; it does not verify live host execution.
+- For a project installation, use `--scope project --root /path/to/project` on both `bootstrap` and `check`.
+- New configurations default to all seven roles, three active children, and inherited host models. Use `--preset recommended` for the bundled Codex or Kimi choices after checking model access. Kimi aliases require [manual model-pool setup](references/hosts/kimi-code.md#recommended-model-pool).
+- Existing configurations are reused unchanged; `--preset` only affects creation. For custom models, role subsets, or concurrency, prepare a source JSON using the [configuration contract](references/configuration.md#configuration-contract), then bootstrap it.
+- Preview creates no files or directories. `--apply` writes only the source configuration and managed profiles. Keep the source outside the skill and managed Agent directories. Bootstrap does not copy the skill itself.
+- The JSON result identifies configuration creation/reuse and static check status. `runtime_verified: false` means live host loading and execution still need verification, even after static checks pass.
+
+The individual `init`, `render`, `install`, and `check` commands remain available for [step-by-step configuration](references/configuration.md#step-by-step-commands). The `setup` wizard remains available for interactive terminal use.
 
 Agent Orchestration was previously named Crew. Existing `crew-*` profile and model alias names, state files, and configuration paths are retained for installation compatibility. See [configuration](references/configuration.md) for the JSON schema, scopes, conflict handling, and updates.
 
@@ -92,7 +109,7 @@ pnpm test
 
 Use `pnpm format` to format scripts and tests. In a Git checkout, the Husky pre-commit hook formats staged scripts and runs the test suite.
 
-Tests cover configuration validation, profile generation, installation conflicts, idempotency, rollback, wizard cancellation, and compatibility with captured legacy fixtures. Runtime commands are also exercised without development dependencies. See [evaluation](references/evaluation.md) for live host acceptance checks and [AGENTS.md](AGENTS.md) for contribution guidelines.
+Tests cover configuration validation, profile generation, bootstrap previews and post-install checks, installation conflicts, idempotency, rollback, wizard cancellation, and compatibility with captured legacy fixtures. Runtime commands are also exercised without development dependencies. See [evaluation](references/evaluation.md) for live host acceptance checks and [AGENTS.md](AGENTS.md) for contribution guidelines.
 
 ## Reference
 
@@ -101,4 +118,3 @@ Tests cover configuration validation, profile generation, installation conflicts
 - [Host acceptance and evaluation](references/evaluation.md)
 - [Interactive testing](references/interactive-testing.md)
 - [Role catalog](assets/roles.json)
-
