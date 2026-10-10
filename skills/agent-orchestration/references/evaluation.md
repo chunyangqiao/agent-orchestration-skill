@@ -26,6 +26,22 @@ These checks prove generation and installation behavior only. Also exercise `set
 
 Check that every catalog role has one matching source Markdown file (excluding `common.md`) and that each generated filename stem matches its native `name`. For `browser-debugger`, verify read-only defaults and explicit browser tool selection; rendering a profile does not establish browser access.
 
+## Invocation acceptance
+
+Exercise these cases when changing invocation or routing rules. Inspect actual child creation and returned evidence; a routing explanation or role-play is only simulated evidence.
+
+| Request or condition | Expected behavior |
+| --- | --- |
+| Explicit invocation with a one-file edit or focused lookup | At least one real enabled `crew-*` child performs bounded work; the main agent uses its result before completion |
+| Explicit invocation with tightly coupled implementation | One writer owns the coupled change; at least one real child contributes without artificial parallel edits |
+| Implicit adoption for a trivial task | Main-agent execution is allowed |
+| Skill invocation without a concrete task in the request or conversation context, or a question about the skill | No child is started solely because the skill was named |
+| Explicit invocation carried through related follow-ups | Suitable children or their existing results are reused; each turn need not start a new child |
+| Later user instruction to stop delegation | The coordinator follows the updated instruction |
+| Explicitly invoked installation with missing profiles | Authorized setup establishes profiles before a real verification child; unavailable live execution is reported as an unmet requirement |
+| Unavailable host tools, enabled profiles, or required model; unresolved child execution failure | Exact limitation and unmet delegation requirement are reported; main-agent fallback is not claimed as successful multi-agent execution |
+| `max_parallel: 1` or one available child slot | Main agent plus one child satisfies the requirement; multiple concurrent children are not required |
+
 ## Live host acceptance
 
 For each claimed host/version, record host version, scope, source config, applied runtime configuration, and actual model/backend. Use an isolated temporary project and bounded tasks:

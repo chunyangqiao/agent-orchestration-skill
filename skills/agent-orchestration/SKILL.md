@@ -1,15 +1,26 @@
 ---
 name: agent-orchestration
-description: Install or configure Agent Orchestration, or coordinate substantial tasks with focused subagents across supported agent hosts. Use when parallel independent work, context isolation, or fresh review materially helps; keep small or tightly coupled tasks in the main conversation.
+description: Install or configure Agent Orchestration, or coordinate tasks with focused subagents across supported agent hosts. Explicit invocation with a concrete task requires delegation; implicit use is appropriate when independent work, context isolation, or fresh review materially helps.
 ---
 
 # Agent Orchestration
 
-Keep the main agent responsible for user intent, architecture, scope, integration, and final acceptance. Delegate independently finishable work when the benefit repays briefing, waiting, and review.
+Keep the main agent responsible for user intent, architecture, scope, integration, and final acceptance.
+
+## Invocation and required delegation
+
+- **Explicit invocation:** when the user asks to use `$agent-orchestration` or names Agent Orchestration as the workflow for a concrete task, dispatch at least one real subagent through an enabled `crew-*` profile. The main agent plus one child satisfies this requirement. Task size, tight coupling, or low expected delegation benefit does not waive it.
+- Give the child a bounded part of the requested work with a usable result. For a small task, delegate one focused lookup, implementation, or verification step; keep coupled implementation with one writer. Parallelize additional children only when their work is independent. A launch announcement, plan, or placeholder assignment does not satisfy the requirement.
+- **Implicit use:** delegate when independent execution or a fresh context repays briefing, waiting, and review. Small or tightly coupled tasks may stay in the main conversation.
+- **No concrete task:** if neither the request nor established conversation context supplies a task, ask for one without starting children. A question about the skill or a request to edit its files is not itself an instruction to use it as the workflow.
+
+Apply explicit invocation to the task and its follow-ups; reuse suitable children without spawning again merely because a new turn began. A later user instruction to stop delegation takes precedence.
+
+Before reporting completion of an explicitly invoked task, collect the child's result and incorporate its usable work or evidence. If delegation or child execution is blocked, follow the failure rules and explicitly report the unmet delegation requirement and exact limitation; main-agent work alone does not fulfill it.
 
 ## Installation requests
 
-For an installation or setup request, follow [AI-driven installation](references/configuration.md#ai-driven-installation) through skill deployment, profile installation, and verification. Collect unresolved choices together, then complete authorized steps without asking again. Copying the skill folder alone is partial installation; report static checks and live host verification separately.
+For an installation or setup request, follow [AI-driven installation](references/configuration.md#ai-driven-installation) through skill deployment, profile installation, and verification. Collect unresolved choices together, then complete authorized steps without asking again. Establish missing profiles before dispatch; a real verification child can fulfill explicit invocation's delegation requirement. Copying the skill folder alone is partial installation; report static checks and live host verification separately.
 
 ## Select the environment
 
@@ -18,8 +29,7 @@ For an installation or setup request, follow [AI-driven installation](references
 3. For customization, configuration conflicts, or missing profiles, read [configuration](references/configuration.md). During ordinary task execution, report missing configuration and the next setup step; install only when the user has requested setup. Model authentication remains in the host.
 4. If the host cannot create real subagents, a required profile is unavailable, or a model/tool choice cannot be honored, explain the limitation and keep the affected work in the main conversation. Do not describe sequential role-playing as parallel or independent review. A future host needs an explicit adapter and verification before being claimed as supported.
 
-When actually delegating, briefly announce Agent Orchestration in the user's language and state the useful work split. For a simple task, work directly without a ceremonial team launch.
-Invoking the skill without a concrete task does not itself start subagents.
+When delegating, briefly announce Agent Orchestration in the user's language and state the child's assignment and the main agent's responsibility.
 
 ## Route by responsibility
 

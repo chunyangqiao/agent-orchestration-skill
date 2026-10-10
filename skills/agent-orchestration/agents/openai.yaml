@@ -1,7 +1,7 @@
 interface:
-  display_name: "Agent Orchestration"
-  short_description: "Parallelize substantial work with focused subagents"
-  default_prompt: "Use $agent-orchestration to decompose this substantial task, dispatch independent bounded slices in parallel when useful, and keep unresolved decisions and final acceptance in the main thread."
+  display_name: 'Agent Orchestration'
+  short_description: 'Coordinate tasks with real, focused subagents'
+  default_prompt: 'Use $agent-orchestration for this task, delegate bounded work to at least one real subagent, and integrate its result while keeping unresolved decisions and final acceptance in the main thread.'
 
 policy:
   allow_implicit_invocation: true

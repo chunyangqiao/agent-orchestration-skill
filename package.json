@@ -1,6 +1,6 @@
 {
   "name": "agent-orchestration",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A portable multi-agent orchestration skill for Codex, Claude Code, and Kimi Code, with configurable roles and models.",
   "keywords": [],
   "license": "MIT",

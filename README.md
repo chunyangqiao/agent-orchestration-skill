@@ -2,9 +2,11 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
+**Version: 2.1.0**
+
 A portable multi-agent orchestration skill for Codex, Claude Code, and Kimi Code, with configurable roles and models.
 
-Use focused subagents for exploration, research, implementation, browser work, and independent review. The main agent keeps responsibility for task scope, architecture, integration, and final acceptance, delegating work when independent execution or a fresh context adds value.
+Use focused subagents for exploration, research, implementation, browser work, and independent review. The main agent keeps responsibility for task scope, architecture, integration, and final acceptance. Explicit invocation with a concrete task requires at least one real subagent; implicit use remains conditional on the benefit of delegation.
 
 ## Features
 
@@ -66,12 +68,12 @@ Alternatively, use the bootstrap command below. Making the skill discoverable an
 After the host discovers the skill and installed profiles, invoke it with a bounded task, for example:
 
 ```text
-Use $agent-orchestration to implement this feature. Delegate independent work
-where useful, preserve existing behavior, and verify the result before finishing.
+Use $agent-orchestration to implement this feature. Delegate bounded work to
+at least one real subagent, preserve existing behavior, and verify the result.
 ```
 
 Start a fresh session if the host has not loaded the profiles yet. Confirm the selected models and available tools with a small task before relying on a new setup.
-Invoking the skill alone does not start subagents: provide a concrete task. Small or tightly coupled tasks can stay in the main conversation.
+Invoking the skill alone does not start subagents: provide a concrete task. With an explicit invocation and a concrete task, the coordinator must dispatch at least one real child and use its result, even for a small task. The main agent plus one child is sufficient; concurrency is optional. If the host, profiles, or required capabilities prevent delegation, the coordinator reports the exact limitation and unmet requirement while completing feasible authorized work. These are workflow instructions, not a host-enforced scheduler.
 
 ## Bootstrap profiles
 
@@ -128,7 +130,7 @@ Agent Orchestration was previously named Crew. Existing `crew-*` profile and mod
 
 The available roles are `explorer`, `docs-researcher`, `browser-debugger`, `executor`, `ui-styler`, `implementer`, and `reviewer`. Enable only the roles you need and configure their models independently.
 
-The coordinator assigns bounded work with explicit ownership and acceptance checks, integrates returned results, and keeps unresolved decisions in the main conversation. Small or tightly coupled tasks can stay with the main agent. See [SKILL.md](skills/agent-orchestration/SKILL.md) for role selection and the full workflow.
+The coordinator assigns bounded work with explicit ownership and acceptance checks, integrates returned results, and keeps unresolved decisions in the main conversation. Coupled implementation stays with one writer. See [SKILL.md](skills/agent-orchestration/SKILL.md) for invocation rules, role selection, and the full workflow.
 
 ## Development
 
