@@ -2,18 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { PassThrough } from 'node:stream';
 import {
   defaultConfig,
   jsonText,
   readJson,
+  MANIFEST,
+  SKILL_ROOT,
 } from '../skills/agent-orchestration/scripts/lib/config.mjs';
+import { runSetup } from '../skills/agent-orchestration/scripts/lib/setup.mjs';
 import {
-  runSetup,
   SetupCancelled,
   terminalPrompter,
-} from '../skills/agent-orchestration/scripts/lib/setup.mjs';
-import { cli, snapshot, temporary } from './helpers.mjs';
+} from '../skills/agent-orchestration/scripts/lib/prompts.mjs';
+import { atomicWrite } from '../skills/agent-orchestration/scripts/lib/install.mjs';
+import { cli, copySkill, snapshot, temporary } from './helpers.mjs';
 
 function wizard(t, answers, host = 'codex') {
   const root = temporary(t);
@@ -23,41 +28,57 @@ function wizard(t, answers, host = 'codex') {
   let index = 0;
   const io = {
     write: (text) => output.push(text),
-    async ask(prompt) {
+    async ask(prompt, fallback) {
       prompts.push(prompt);
-      return answers[index++];
+      const value = answers[index++];
+      if (value === undefined || value === 'cancel') throw new SetupCancelled();
+      return value || fallback || '';
+    },
+    async choice(message, items, fallback = 1) {
+      return Number(await io.ask(`${message}: ${items.join(', ')}`, String(fallback))) - 1;
+    },
+    async roles(message, names, fallback = 'all') {
+      const value = await io.ask(message, fallback);
+      if (value === 'all') return names;
+      if (value === 'none') return [];
+      return value.split(',').map((index) => names[Number(index) - 1]);
+    },
+    async confirm(message) {
+      return (await io.ask(message, '1')) === '2';
     },
   };
   return { root, config, output, prompts, io, options: { host, scope: 'project', root, config } };
 }
 
-test('numbered wizard accepts recommended defaults and previews before writing', async (t) => {
+test('wizard accepts recommended defaults and previews before writing', async (t) => {
   const w = wizard(t, ['', '', '', '2']);
   const ask = w.io.ask;
-  w.io.ask = async (prompt) => {
+  w.io.ask = async (prompt, fallback) => {
     assert.deepEqual(snapshot(w.root), {});
-    return ask(prompt);
+    return ask(prompt, fallback);
   };
   assert.equal(await runSetup(w.options, w.io), 0);
   assert.deepEqual(readJson(w.config), defaultConfig('codex', 'recommended'));
   assert.match(w.output.join('\n'), /create: crew-reviewer.toml/);
+  const result = JSON.parse(w.output.find((text) => text.startsWith('{')));
+  assert.equal(result.static_check.status, 'passed');
+  assert.equal(result.runtime_verified, false);
   cli(w.root, ['check', '--config', w.config, '--scope', 'project', '--root', w.root]);
 });
 
-test('invalid selections retry and only selected roles are customized', async (t) => {
-  const w = wizard(t, [
-    'bad',
-    '1,7',
-    '0',
-    '2',
-    '9',
-    '2',
-    '2',
-    'custom-review-model',
-    'bad',
-    '5',
-    '2',
-  ]);
+test('disabling all roles reports that no live role probe can run', async (t) => {
+  const w = wizard(t, ['none', '', '', '2']);
+  assert.equal(await runSetup(w.options, w.io), 0);
+  assert.deepEqual(readJson(w.config).roles, {});
+  assert.match(w.output.join('\n'), /All roles are disabled; no live role probe/);
+  assert.equal(
+    JSON.parse(w.output.find((text) => text.startsWith('{'))).static_check.status,
+    'passed',
+  );
+});
+
+test('only selected roles are customized', async (t) => {
+  const w = wizard(t, ['1,7', '2', '2', '2', 'custom-review-model', '5', '2']);
   assert.equal(await runSetup(w.options, w.io), 0);
   const config = readJson(w.config);
   assert.deepEqual(Object.keys(config.roles), ['explorer', 'reviewer']);
@@ -117,7 +138,7 @@ test('existing source is reused unchanged; new path can be chosen without overwr
   fs.writeFileSync(other.config, 'unrelated choices');
   const newPath = path.join(other.root, 'new.json');
   const answers = ['2', newPath, '', '', '4', '2'];
-  other.io.ask = async () => answers.shift();
+  other.io.ask = async (_, fallback) => answers.shift() || fallback;
   await runSetup(other.options, other.io);
   assert.equal(fs.readFileSync(other.config, 'utf8'), 'unrelated choices');
   assert.deepEqual(readJson(newPath), defaultConfig('codex'));
@@ -131,7 +152,7 @@ test('existing config host mismatch and source inside target fail without change
   assert.deepEqual(snapshot(w.root), before);
   const invalid = wizard(t, []);
   invalid.options.config = path.join(invalid.root, '.codex/agents/choices.json');
-  await assert.rejects(runSetup(invalid.options, invalid.io), /outside the managed/);
+  await assert.rejects(runSetup(invalid.options, invalid.io), /outside the skill and managed/);
   assert.deepEqual(snapshot(invalid.root), {});
 });
 
@@ -149,13 +170,13 @@ test('a change during confirmation invalidates the preview', async (t) => {
   const w = wizard(t, ['', '', '', '2']);
   const ask = w.io.ask;
   let count = 0;
-  w.io.ask = async (prompt) => {
+  w.io.ask = async (prompt, fallback) => {
     if (++count === 4) {
       const target = path.join(w.root, '.codex/agents');
       fs.mkdirSync(target, { recursive: true });
       fs.writeFileSync(path.join(target, 'crew-reviewer.toml'), 'concurrent edits');
     }
-    return ask(prompt);
+    return ask(prompt, fallback);
   };
   await assert.rejects(runSetup(w.options, w.io), /changed since preview/);
   assert.equal(fs.existsSync(w.config), false);
@@ -166,7 +187,7 @@ test('a change during confirmation invalidates the preview', async (t) => {
 });
 
 test('terminal EOF and SIGINT cancel pending input without hanging', async () => {
-  for (const inputValue of ['\x04', '\x03']) {
+  for (const inputValue of ['\x04', '\x03', '\x1b']) {
     const input = new PassThrough();
     const output = new PassThrough();
     input.isTTY = true;
@@ -189,6 +210,89 @@ test('non-interactive CLI fails immediately with alternatives', (t) => {
     2,
   );
   assert.match(result.stderr, /requires an interactive terminal/);
-  assert.match(result.stderr, /init --preset/);
+  assert.match(result.stderr, /bootstrap/);
   assert.deepEqual(snapshot(w.root), {});
+});
+
+test('wizard rejects source paths inside the skill or managed directory through aliases', async (t) => {
+  const w = wizard(t, []);
+  const alias = path.join(w.root, 'skill-link');
+  fs.symlinkSync(SKILL_ROOT, alias, 'dir');
+  const managed = path.join(w.root, '.codex/agents');
+  fs.mkdirSync(managed, { recursive: true });
+  const managedAlias = path.join(w.root, 'agents-link');
+  fs.symlinkSync(managed, managedAlias, 'dir');
+  const before = snapshot(w.root);
+  for (const directory of [SKILL_ROOT, alias, managedAlias]) {
+    await assert.rejects(
+      runSetup({ ...w.options, config: path.join(directory, 'setup-test.json') }, w.io),
+      /outside the skill and managed/,
+    );
+    assert.deepEqual(snapshot(w.root), before);
+  }
+});
+
+test('wizard reports post-install failure and retains artifacts for diagnosis', async (t) => {
+  for (const corruptSource of [false, true]) {
+    const w = wizard(t, ['', '', '', '2']);
+    const exitCode = await runSetup(w.options, w.io, (file, data) => {
+      atomicWrite(file, data);
+      if (path.basename(file) === MANIFEST) {
+        if (corruptSource)
+          fs.writeFileSync(w.config, jsonText({ ...defaultConfig('codex'), max_parallel: 1 }));
+        else fs.unlinkSync(path.join(path.dirname(file), 'crew-explorer.toml'));
+      }
+    });
+    assert.equal(exitCode, 1);
+    const result = JSON.parse(w.output.find((text) => text.startsWith('{')));
+    assert.equal(result.static_check.status, 'failed');
+    assert.notEqual(result.status, 'applied');
+    assert.equal(result.runtime_verified, false);
+    assert.ok(fs.existsSync(w.config));
+    assert.doesNotMatch(w.output.join('\n'), /Static checks passed/);
+  }
+});
+
+test('wizard write failures roll back profiles and newly created source', async (t) => {
+  const w = wizard(t, ['', '', '', '2']);
+  let writes = 0;
+  await assert.rejects(
+    runSetup(w.options, w.io, (file, data) => {
+      if (++writes === 3) throw new Error('injected write failure');
+      atomicWrite(file, data);
+    }),
+    /injected write failure/,
+  );
+  assert.deepEqual(snapshot(w.root), {});
+});
+
+test('a source created during confirmation is preserved and requires a new preview', async (t) => {
+  const w = wizard(t, ['', '', '']);
+  w.io.confirm = async () => {
+    fs.writeFileSync(w.config, 'concurrent choices');
+    return true;
+  };
+  await assert.rejects(runSetup(w.options, w.io), /appeared since preview/);
+  assert.equal(fs.readFileSync(w.config, 'utf8'), 'concurrent choices');
+  assert.equal(fs.existsSync(path.join(w.root, '.codex/agents')), false);
+});
+
+test('copied skill includes the executable wizard and works without node_modules', async (t) => {
+  const w = wizard(t, ['', '', '', '2']);
+  const copy = path.join(w.root, 'skill');
+  copySkill(copy);
+  assert.equal(fs.existsSync(path.join(copy, 'node_modules')), false);
+  assert.equal(fs.existsSync(path.join(copy, 'package.json')), false);
+  const entry = path.join(copy, 'scripts/setup.mjs');
+  cli(w.root, ['--help'], 0, entry);
+  if (process.platform !== 'win32') {
+    const help = spawnSync(entry, ['--help'], { cwd: w.root, encoding: 'utf8', timeout: 10000 });
+    assert.equal(help.status, 0, help.stderr);
+    assert.match(help.stdout, /Inquirer/);
+  }
+  const copied = await import(pathToFileURL(path.join(copy, 'scripts/lib/setup.mjs')).href);
+  assert.equal(await copied.runSetup(w.options, w.io), 0);
+  const result = JSON.parse(w.output.find((text) => text.startsWith('{')));
+  assert.equal(result.static_check.status, 'passed');
+  assert.equal(result.runtime_verified, false);
 });

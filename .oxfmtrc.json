@@ -1,6 +1,10 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["pnpm-lock.yaml", "tests/fixtures/**"],
+  "ignorePatterns": [
+    "pnpm-lock.yaml",
+    "tests/fixtures/**",
+    "skills/agent-orchestration/scripts/vendor/**"
+  ],
   "singleQuote": true,
   "tabWidth": 2,
   "printWidth": 100

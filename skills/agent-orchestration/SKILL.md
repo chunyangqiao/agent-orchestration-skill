@@ -20,7 +20,7 @@ Before reporting completion of an explicitly invoked task, collect the child's r
 
 ## Installation requests
 
-For an installation or setup request, follow [AI-driven installation](references/configuration.md#ai-driven-installation) through skill deployment, profile installation, and verification. Collect unresolved choices together, then complete authorized steps without asking again. Establish missing profiles before dispatch; a real verification child can fulfill explicit invocation's delegation requirement. Copying the skill folder alone is partial installation; report static checks and live host verification separately.
+For an installation or setup request, follow [AI-driven installation](references/configuration.md#ai-driven-installation) through verified skill deployment, non-interactive profile installation, independent static checks, and a live role probe. Collect unresolved choices together, then complete authorized steps without asking again. Use the guide's completion evidence before ending the task; leave blocked runtime verification explicitly pending with a precise next step. Establish missing profiles before dispatch; a real verification child can fulfill explicit invocation's delegation requirement. The AI-driven path completes configuration in the conversation without handing the user a terminal wizard.
 
 ## Select the environment
 

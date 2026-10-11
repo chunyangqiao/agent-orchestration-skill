@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createInterface } from 'node:readline/promises';
 import {
   catalog,
   ConfigError,
@@ -13,90 +12,11 @@ import {
   kimiModels,
   presets,
   readJson,
-  render,
   validate,
 } from './config.mjs';
-import {
-  install,
-  installationPlan,
-  report,
-  stat,
-  targetDirectory,
-  writeNewConfig,
-} from './install.mjs';
-
-export class SetupCancelled extends Error {
-  constructor() {
-    super('Setup cancelled');
-    this.name = 'SetupCancelled';
-  }
-}
-
-export function terminalPrompter(input = process.stdin, output = process.stdout) {
-  if (!input.isTTY || !output.isTTY)
-    throw new ConfigError(
-      'setup requires an interactive terminal. Ask choices in your agent conversation, then use init --preset, render, install and check with a config file.',
-    );
-  const rl = createInterface({ input, output });
-  let closed = false;
-  rl.on('close', () => {
-    closed = true;
-  });
-  rl.on('SIGINT', () => rl.close());
-  return {
-    write: (text) => output.write(`${text}\n`),
-    close: () => rl.close(),
-    async ask(prompt) {
-      if (closed) throw new SetupCancelled();
-      const controller = new AbortController();
-      const abort = () => controller.abort();
-      rl.once('close', abort);
-      try {
-        return await rl.question(prompt, { signal: controller.signal });
-      } catch (error) {
-        if (controller.signal.aborted) throw new SetupCancelled();
-        throw error;
-      } finally {
-        rl.off('close', abort);
-      }
-    },
-  };
-}
-
-function questions(io) {
-  async function ask(label, fallback) {
-    const value = await io.ask(`${label}${fallback === undefined ? '' : ` [${fallback}]`}: `);
-    if (value === undefined || value === null || value.trim().toLowerCase() === 'cancel')
-      throw new SetupCancelled();
-    return value.trim() || fallback || '';
-  }
-  async function choice(label, items, fallback = 1) {
-    io.write(`\n${label}\n${items.map((item, index) => `  ${index + 1}. ${item}`).join('\n')}`);
-    for (;;) {
-      const answer = await ask('Choose a number', String(fallback));
-      if (/^[1-9]\d*$/.test(answer) && Number(answer) <= items.length) return Number(answer) - 1;
-      io.write(`Enter a number from 1 to ${items.length}.`);
-    }
-  }
-  async function roles(label, names, fallback = 'all') {
-    io.write(`\n${label}\n${names.map((name, index) => `  ${index + 1}. ${name}`).join('\n')}`);
-    for (;;) {
-      const value = await ask('Numbers separated by commas, all, or none', fallback);
-      if (value === 'all') return [...names];
-      if (value === 'none') return [];
-      const tokens = value.split(',').map((token) => token.trim());
-      if (
-        tokens.every((token) => /^[1-9]\d*$/.test(token) && Number(token) <= names.length) &&
-        new Set(tokens).size === tokens.length
-      ) {
-        const selected = new Set(tokens.map((token) => names[Number(token) - 1]));
-        return names.filter((name) => selected.has(name));
-      }
-      io.write('Enter distinct valid role numbers, all, or none.');
-    }
-  }
-  return { ask, choice, roles };
-}
+import { atomicWrite, stat, targetDirectory } from './install.mjs';
+import { runBootstrap, sourceConfigPath } from './bootstrap.mjs';
+import { SetupCancelled } from './prompts.mjs';
 
 export function roleSummary(config) {
   const models = kimiModels();
@@ -128,7 +48,7 @@ async function customize(config, selected, q, io) {
             'Inherit host model and effort',
             'Enter an existing host model-pool alias',
           ],
-          aliases.indexOf(config.roles[role].model) + 1 || 4,
+          aliases.indexOf(config.roles[role].model) + 1 || aliases.length + 1,
         );
         if (selectedModel < aliases.length) options = { model: aliases[selectedModel] };
         else if (selectedModel === aliases.length) options = { model: 'inherit' };
@@ -160,9 +80,11 @@ async function customize(config, selected, q, io) {
   }
 }
 
-export async function runSetup(options, io) {
-  const q = questions(io);
-  io.write('Agent Orchestration setup. Type cancel or press Ctrl-C to exit without writing.');
+export async function runSetup(options, io, write = atomicWrite) {
+  const q = io;
+  io.write(
+    'Agent Orchestration setup. Use arrow keys, Space to select roles, and Enter to continue.\nPress Esc, Ctrl-C or Ctrl-D to cancel before saving.',
+  );
   const host = options.host ?? HOSTS[await q.choice('Host', HOSTS)];
   const scope =
     options.scope ??
@@ -180,6 +102,7 @@ export async function runSetup(options, io) {
   let config;
   let original;
   for (;;) {
+    sourceConfigPath(configPath, target);
     if (!stat(configPath)) break;
     if (
       (await q.choice(`Configuration already exists: ${configPath}`, [
@@ -198,20 +121,17 @@ export async function runSetup(options, io) {
       );
     break;
   }
-  const relative = path.relative(target, configPath);
-  if (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
-    throw new ConfigError('Keep the source config outside the managed Agent directory.');
   if (!config) {
     const enabled = await q.roles('Enabled roles', Object.keys(catalog()));
-    let limit;
-    for (;;) {
-      const answer = await q.ask('Maximum active children', '3');
-      if (/^[1-9]\d*$/.test(answer) && Number.isSafeInteger(Number(answer))) {
-        limit = Number(answer);
-        break;
-      }
-      io.write('Enter a positive safe integer.');
-    }
+    const limit = Number(
+      await q.ask(
+        'Maximum active children',
+        '3',
+        (value) =>
+          (/^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value))) ||
+          'Enter a positive safe integer.',
+      ),
+    );
     const hasRecommended = Object.hasOwn(presets(), host);
     const modes = hasRecommended
       ? [
@@ -231,8 +151,10 @@ export async function runSetup(options, io) {
       await customize(config, selected, q, io);
     } else if (hasRecommended ? mode === 2 : mode === 1) await customize(config, enabled, q, io);
   }
-  const files = render(config);
-  const changes = installationPlan(target, config, files);
+  const bootstrapOptions = { host, scope, root, config: configPath };
+  const unsaved = original ? undefined : config;
+  const preview = runBootstrap(bootstrapOptions, write, unsaved);
+  const changes = preview.result.changes;
   io.write(
     `\nConfiguration: ${configPath}\nTarget: ${target}\nMaximum active children: ${config.max_parallel}\n${roleSummary(config)}`,
   );
@@ -248,30 +170,21 @@ export async function runSetup(options, io) {
     io.write('Conflicts found. No configuration or profile files were written.');
     return 1;
   }
-  if (
-    (await q.choice('Save configuration and install profiles?', [
-      'Cancel without writing',
-      'Save and install',
-    ])) === 0
-  )
+  if (!(await q.confirm('Save configuration, install profiles and verify?')))
     throw new SetupCancelled();
   // Recheck the preview after waiting for user input, before writing anything.
-  targetDirectory(config.host, scope, root);
-  if (JSON.stringify(changes) !== JSON.stringify(installationPlan(target, config, files)))
-    throw new ConfigError('Installation changed since preview. Run setup again.');
   if (original && !fs.readFileSync(configPath).equals(original))
     throw new ConfigError('Source configuration changed since preview. Run setup again.');
-  let created = false;
-  try {
-    if (!original) {
-      writeNewConfig(configPath, config);
-      created = true;
-    }
-    install(target, config, files, changes);
-  } catch (error) {
-    if (created) fs.unlinkSync(configPath);
-    throw error;
-  }
-  io.write(jsonText(report(target, config, changes, true)));
-  return 0;
+  const refreshed = runBootstrap(bootstrapOptions, write, unsaved);
+  if (JSON.stringify(changes) !== JSON.stringify(refreshed.result.changes))
+    throw new ConfigError('Installation changed since preview. Run setup again.');
+  const { result, exitCode } = runBootstrap({ ...bootstrapOptions, apply: true }, write, unsaved);
+  io.write(jsonText(result));
+  if (exitCode === 0)
+    io.write(
+      Object.keys(config.roles).length
+        ? 'Static checks passed. Live host verification is pending: ask your agent to load the installed crew-* profile and run a bounded read-only probe; start a fresh session if needed.'
+        : 'Static checks passed. All roles are disabled; no live role probe can run with this configuration.',
+    );
+  return exitCode;
 }

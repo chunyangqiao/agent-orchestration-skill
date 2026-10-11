@@ -35,14 +35,8 @@ function contains(directory, file) {
   );
 }
 
-export function runBootstrap(options, write = atomicWrite) {
-  for (const key of ['host', 'scope', 'config']) {
-    if (!options[key]) throw new ConfigError(`--${key} is required`);
-  }
-  if (options.preset !== undefined && !['inherit', 'recommended'].includes(options.preset))
-    throw new ConfigError(`Unknown preset: ${options.preset}`);
-  const target = targetDirectory(options.host, options.scope, options.root);
-  const configPath = expandPath(options.config);
+export function sourceConfigPath(file, target) {
+  const configPath = expandPath(file);
   for (const directory of [SKILL_ROOT, target]) {
     if (
       contains(directory, configPath) ||
@@ -54,9 +48,26 @@ export function runBootstrap(options, write = atomicWrite) {
   }
   const info = stat(configPath);
   if (info && !info.isFile()) throw new ConfigError('Source config must be a regular file.');
+  return configPath;
+}
+
+// newConfig carries unsaved wizard choices through the same preview/apply/check path.
+export function runBootstrap(options, write = atomicWrite, newConfig) {
+  for (const key of ['host', 'scope', 'config']) {
+    if (!options[key]) throw new ConfigError(`--${key} is required`);
+  }
+  if (options.preset !== undefined && !['inherit', 'recommended'].includes(options.preset))
+    throw new ConfigError(`Unknown preset: ${options.preset}`);
+  const target = targetDirectory(options.host, options.scope, options.root);
+  const configPath = sourceConfigPath(options.config, target);
+  const info = stat(configPath);
+  if (info && newConfig)
+    throw new ConfigError('Source configuration appeared since preview. Run setup again.');
   const config = info
     ? validate(readJson(configPath))
-    : defaultConfig(options.host, options.preset);
+    : newConfig
+      ? validate(newConfig)
+      : defaultConfig(options.host, options.preset);
   if (config.host !== options.host)
     throw new ConfigError(
       `Existing config is for ${config.host}, but bootstrap selected ${options.host}.`,
@@ -68,7 +79,7 @@ export function runBootstrap(options, write = atomicWrite) {
     source_config: {
       path: configPath,
       action: info ? 'reuse' : 'create',
-      preset: info ? null : (options.preset ?? 'inherit'),
+      preset: info || newConfig ? null : (options.preset ?? 'inherit'),
       note: info
         ? 'Existing configuration reused unchanged; --preset is not applied.'
         : 'New configuration is saved only with --apply.',

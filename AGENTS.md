@@ -7,7 +7,7 @@ Agent Orchestration coordinates subagents and generates profiles for Codex, Clau
 The complete installable skill lives in `skills/agent-orchestration/`. Paths in the following skill inventory are relative to that directory:
 
 - `SKILL.md` defines the coordination workflow.
-- `scripts/configure.mjs` is the CLI; `scripts/lib/` contains configuration, installation, and setup logic.
+- `scripts/configure.mjs` is the CLI; executable `scripts/setup.mjs` opens the manual wizard. `scripts/lib/` contains configuration, installation, and setup logic; `scripts/vendor/` contains generated Inquirer prompts and their licenses.
 - `assets/roles.json` catalogs roles; `assets/roles/*.md` contains role instructions and shared `common.md` content. Presets and Kimi model variants are separate JSON assets.
 - `references/hosts/` documents host adapters; other references cover configuration, evaluation, and interactive testing.
 - `agents/openai.yaml` supplies skill UI metadata, not an executable agent profile.
@@ -20,7 +20,7 @@ Repository development files stay at the root:
 
 ## Build, Test, and Development Commands
 
-Runtime scripts require Node.js 22+ with no third-party packages or build step. Development tooling requires Node.js 22.22.1+ (24 LTS recommended). Install development dependencies with the package manager declared in `package.json`, then run commands from the repository root:
+Runtime scripts require Node.js 22+ with no dependency installation or build step for users. Inquirer is bundled for the manual wizard; the non-interactive CLI uses Node.js built-ins and local modules. Development tooling requires Node.js 22.22.1+ (24 LTS recommended). Install development dependencies with the package manager declared in `package.json`, then run commands from the repository root:
 
 ```bash
 pnpm format
@@ -40,6 +40,8 @@ The direct repository entrypoint is `node skills/agent-orchestration/scripts/con
 ## Coding Style & Naming Conventions
 
 Use JavaScript ESM (`.mjs`), two-space indentation, `camelCase` functions, `PascalCase` classes, and `UPPER_CASE` constants. Keep runtime imports limited to Node.js built-ins and local modules. JSON uses two-space indentation and a trailing newline. Oxfmt formats scripts and tests using `.oxfmtrc.json`; no linter is configured.
+
+The root `scripts/build-prompts.mjs` bundles Inquirer from locked development dependencies. Run `pnpm build:prompts` after updating them; include the generated bundle and third-party licenses, without hand-editing or formatting `scripts/vendor/`. `pnpm test` checks bundle freshness before running tests. Preserve the executable bit on the manual setup entrypoint.
 
 Use lowercase kebab-case role IDs, matching the skill's `assets/roles/<role>.md`; generated profile names start with `crew-`. Keep catalog entries, role instructions, host references, and generator behavior consistent.
 

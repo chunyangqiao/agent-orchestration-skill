@@ -11,7 +11,7 @@ export function assertNodeVersion(version = process.versions.node) {
   }
 }
 
-const HELP = `Agent Orchestration profile configuration — Node.js 22+, no runtime dependencies.
+const HELP = `Agent Orchestration profile configuration — Node.js 22+, dependencies bundled.
 
 Examples below run from the installed skill directory.
 From the repository root, use pnpm run configure <command> or
@@ -27,7 +27,8 @@ From another directory, use the absolute path to scripts/configure.mjs.
 
 Hosts: codex, claude-code, kimi-code. Project scope requires --root.
 init refuses existing files; inherit is the default preset. No Claude recommended preset.
-setup uses a numbered terminal wizard; agents should collect choices in conversation.
+setup uses an Inquirer terminal wizard; scripts/setup.mjs is its executable shortcut.
+Agents collect choices in conversation and complete bootstrap, without a terminal wizard.
 install previews by default; --apply writes profiles. Kimi model-pool setup stays manual.
 bootstrap previews without writes; --apply saves new config, installs and checks profiles.
 Existing bootstrap configs are reused unchanged; preset applies only to new configs.
@@ -93,7 +94,8 @@ export async function main(argv = process.argv.slice(2)) {
     if (options.scope !== undefined && !['user', 'project'].includes(options.scope))
       throw new ConfigError('--scope must be user or project');
     if (command === 'setup') {
-      const { runSetup, terminalPrompter } = await import('./lib/setup.mjs');
+      const { runSetup } = await import('./lib/setup.mjs');
+      const { terminalPrompter } = await import('./lib/prompts.mjs');
       io = terminalPrompter();
       return await runSetup(options, io);
     }

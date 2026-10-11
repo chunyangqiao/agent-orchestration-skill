@@ -53,12 +53,14 @@ skills/agent-orchestration/references/configuration.md 中的 AI 驱动安装指
 
 ```bash
 node --version
-node scripts/configure.mjs setup
+./scripts/setup.mjs
+# Windows，或复制时未保留可执行权限：
+node scripts/setup.mjs
 ```
 
-已安装的技能只需要 Node.js，不包含 `package.json` 或开发依赖。如需从源码仓库配置角色，可在仓库根目录运行 `pnpm run setup` 或 `node skills/agent-orchestration/scripts/configure.mjs setup`。
+已安装的技能只需要 Node.js；Inquirer 提示组件及其许可证随技能打包，无需 `package.json` 或另行安装依赖。如需从源码仓库配置角色，可在仓库根目录运行 `pnpm run setup` 或 `./skills/agent-orchestration/scripts/setup.mjs`。原有的 `node scripts/configure.mjs setup` 入口仍然可用。
 
-向导会收集宿主、安装范围、配置路径、角色、并发上限和模型选择，在写入前预览变更并请求确认。输入 `cancel`、按 Ctrl-C 或发送 EOF 均可取消。保存的配置位于技能目录之外，以便更新技能时保留你的选择。
+Inquirer 向导会收集宿主、安装范围、配置路径、角色、并发上限和模型选择。使用方向键导航、空格选择角色；预览变更并确认后才写入，确认默认选择“否”，安装后自动检查保存的文件。确认前可按 Esc、Ctrl-C、Ctrl-D、发送 EOF，或在文本输入中键入 `cancel` 取消。保存的配置位于技能目录之外，以便更新技能时保留你的选择。静态检查通过后仍需验证宿主实际运行。
 
 也可以使用下文的引导命令。让宿主发现技能和安装智能体角色配置，这两步都必须完成。
 
@@ -156,6 +158,8 @@ pnpm install --frozen-lockfile
 pnpm format:check
 pnpm test
 ```
+
+更新 Inquirer 时，运行 `pnpm build:prompts` 并一同提交生成的包和许可证。`pnpm test` 会检查打包产物与锁定依赖是否一致；安装后的用户无需构建。
 
 使用 `pnpm format` 格式化脚本和测试。使用 `pnpm lint-staged` 通过 Oxfmt 格式化暂存的 `.mjs`、JSON 和 YAML 文件，排除锁文件和旧版测试夹具。在 Git 检出目录中，`pnpm prepare` 会启用 Husky 的 pre-commit 钩子，依次执行 `pnpm lint-staged` 和 `pnpm test`。
 

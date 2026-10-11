@@ -54,12 +54,14 @@ Clone or download this repository, then deploy the complete `skills/agent-orches
 
 ```bash
 node --version
-node scripts/configure.mjs setup
+./scripts/setup.mjs
+# Windows, or if executable permissions were not preserved:
+node scripts/setup.mjs
 ```
 
-The installed skill needs only Node.js; it has no `package.json` or development dependencies. To configure profiles from a source checkout instead, run `pnpm run setup` or `node skills/agent-orchestration/scripts/configure.mjs setup` from the repository root.
+The installed skill needs only Node.js; Inquirer prompts and their licenses are bundled, with no `package.json` or dependency installation required. To configure profiles from a source checkout instead, run `pnpm run setup` or `./skills/agent-orchestration/scripts/setup.mjs` from the repository root. The existing `node scripts/configure.mjs setup` entrypoint also works.
 
-The wizard collects the host, installation scope, configuration path, roles, concurrency limit, and model choices. It previews changes and asks for confirmation before writing. Cancel with `cancel`, Ctrl-C, or EOF. Saved configurations remain outside the skill directory so updates preserve your choices.
+The Inquirer wizard collects the host, installation scope, configuration path, roles, concurrency limit, and model choices. Use arrow keys to navigate and Space to select roles. It previews changes and asks for confirmation (default: no), then installs and checks the saved files. Before confirmation, press Esc, Ctrl-C, Ctrl-D, send EOF, or type `cancel` in a text input to stop. Saved configurations remain outside the skill directory so updates preserve your choices. Static success still requires a live host probe.
 
 Alternatively, use the bootstrap command below. Making the skill discoverable and installing its agent profiles are both required.
 
@@ -157,6 +159,8 @@ pnpm install --frozen-lockfile
 pnpm format:check
 pnpm test
 ```
+
+When updating Inquirer, run `pnpm build:prompts` and include the generated bundle and licenses. `pnpm test` checks that this bundle matches the locked dependencies; installed users need no build step.
 
 Use `pnpm format` to format scripts and tests. Use `pnpm lint-staged` to format staged `.mjs`, JSON, and YAML files with Oxfmt; the lockfile and legacy fixtures are excluded. In a Git checkout, `pnpm prepare` enables the Husky pre-commit hook, which runs `pnpm lint-staged` followed by `pnpm test`.
 
