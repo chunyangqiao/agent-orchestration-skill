@@ -16,7 +16,7 @@ The installed skill contains no development package or test suite. Run its CLI w
 
 Exercise each host in a temporary project: initialize a config, render profiles, preview installation, apply it, and run `check`. Verify inherited and explicit models, role subsets, repeat installs, changed local files, removal of disabled managed roles, and preservation of unrelated profiles. Invalid or unsupported configuration must fail explicitly. Run the skill format validator available in the author's environment and check local document links.
 
-Also exercise `bootstrap` for each host without a TTY: preview a missing source config without writes, apply, and independently run `check`. Cover existing custom configs, creation-only presets, invalid source locations, conflicts before config creation, installation rollback, and post-install verification failure. Repeat application must preserve unchanged contents and timestamps. Copy the complete skill into a temporary directory without repository files, `package.json`, or `node_modules`, then exercise all three hosts from a different working directory. Verify the CLI through a symlinked skill directory, allow a source config in the temporary checkout's root `.crew/`, and reject configs inside the skill or managed Agent directory, including symlink aliases. Redirect user-scope host directories into temporary paths. A passing `static_check` and `runtime_verified: false` must remain distinct from live acceptance.
+Also exercise `bootstrap` for each host without a TTY: preview a missing source config without writes, apply, and independently run `check`. Cover existing custom configs, creation-only presets, invalid source locations, conflicts before config creation, installation rollback, and post-install verification failure. Repeat application must preserve unchanged contents and timestamps. Copy the complete skill into a temporary directory without repository files, `package.json`, or `node_modules`, then exercise all four hosts from a different working directory. Verify the CLI through a symlinked skill directory, allow a source config in the temporary checkout's root `.crew/`, and reject configs inside the skill or managed Agent directory, including symlink aliases. Redirect user-scope host directories into temporary paths. Cursor has no config-home variable; set `HOME` for that host. A passing `static_check` and `runtime_verified: false` must remain distinct from live acceptance.
 
 For the AI installation workflow, inspect the completion evidence: a discoverable complete skill folder, source configuration and target paths, static check results, and a live probe result or exact blocker/next step. Copying the skill alone must be reported as partial. Reuse established choices and collect remaining choices together; do not require the user to run the terminal wizard after asking an agent to install.
 
@@ -24,7 +24,7 @@ The test suite uses Node's built-in runner and the development-only `smol-toml` 
 
 These checks prove generation and installation behavior only. Also exercise `scripts/setup.mjs` in a real terminal, including arrow navigation, role checkboxes, invalid-input correction, final confirmation and cancellation. Verify that EOF or cancellation before confirmation leaves configuration and profiles untouched, existing choices remain unchanged, and recommended Kimi setup only displays a manual merge snippet. Inject a post-install file mismatch in tests and require a failed static check and nonzero exit, retaining artifacts for diagnosis.
 
-Check that every catalog role has one matching source Markdown file (excluding `common.md`) and that each generated filename stem matches its native `name`. For `browser-debugger`, verify read-only defaults and explicit browser tool selection; rendering a profile does not establish browser access.
+Check that every catalog role has one matching source Markdown file (excluding `common.md`) and that each generated filename stem matches its native `name`. For `browser-debugger`, verify read-only defaults and explicit browser tool selection; rendering a profile does not establish browser access. Cursor read-only roles render `readonly: true` and omit a tool allowlist.
 
 ## Invocation acceptance
 
@@ -90,7 +90,11 @@ Persisted JSONL rollouts were inspected under `$CODEX_HOME/sessions/2026/10/10/`
 | Parallel explorer | `01a12507-63a8-7831-b3cf-4f9822114e1b` | Role: 1; model/effort/sandbox: 8; result: 52 |
 | Parallel reviewer | `01a12507-8219-7fe0-8fae-3f953043e67c` | Role: 1; model/effort/sandbox: 8; boundary execution: 18; result: 27 |
 
-These probes verify successful read-only explicit invocation, result integration, and the observed Explorer/Reviewer model mappings on this CLI version. They do not establish automatic parallel fan-out without a parallel request, concurrency-limit enforcement, other invocation/failure cases, writing tasks, other roles, or live Claude Code/Kimi Code behavior. Raw rollouts and temporary fixtures remain local; this record preserves the observed results without bundling full session logs into the skill.
+These probes verify successful read-only explicit invocation, result integration, and the observed Explorer/Reviewer model mappings on this CLI version. They do not establish automatic parallel fan-out without a parallel request, concurrency-limit enforcement, other invocation/failure cases, writing tasks, other roles, or live Claude Code, Kimi Code, or Cursor behavior. Raw rollouts and temporary fixtures remain local; this record preserves the observed results without bundling full session logs into the skill.
+
+## Cursor live acceptance
+
+Not yet run. Static generation and installation are covered by the test suite. A passing static check does not establish that Cursor loaded `crew-*` profiles or honored a pinned model string. The next probe is a fresh session: confirm the enabled `crew-*` names are selectable, run one read-only explorer probe, and compare the task card's model with the profile. Plus and the legacy Start plan fix Grok at medium effort and standard speed; a different card model is a mismatch.
 
 ## Compare useful outcomes
 

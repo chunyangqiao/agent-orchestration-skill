@@ -56,14 +56,22 @@ for (const host of HOSTS) {
       'kimi-code': 'KIMI_CODE_HOME',
     }[host];
     const home = path.join(f.root, 'host');
+    const env = { ...process.env };
+    const expected = path.join(home, 'agents');
+    if (host === 'cursor') {
+      env.HOME = home;
+    } else env[variable] = home;
     const result = cli(
       f.root,
       ['bootstrap', '--host', host, '--scope', 'user', '--config', f.config, '--apply'],
       0,
       undefined,
-      { env: { ...process.env, [variable]: home } },
+      { env },
     );
-    assert.equal(JSON.parse(result.stdout).target, path.join(home, 'agents'));
+    assert.equal(
+      JSON.parse(result.stdout).target,
+      host === 'cursor' ? path.join(home, '.cursor', 'agents') : expected,
+    );
   });
 }
 

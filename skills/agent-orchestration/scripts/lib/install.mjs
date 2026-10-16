@@ -27,7 +27,12 @@ export function stat(file) {
 export function targetDirectory(host, scope, root) {
   if (!HOSTS.includes(host)) throw new ConfigError('Unknown host');
   if (!['user', 'project'].includes(scope)) throw new ConfigError('scope must be user or project');
-  const folders = { codex: '.codex', 'claude-code': '.claude', 'kimi-code': '.kimi-code' };
+  const folders = {
+    codex: '.codex',
+    'claude-code': '.claude',
+    'kimi-code': '.kimi-code',
+    cursor: '.cursor',
+  };
   let base;
   if (scope === 'project') {
     if (!root)
@@ -40,7 +45,7 @@ export function targetDirectory(host, scope, root) {
       'claude-code': 'CLAUDE_CONFIG_DIR',
       'kimi-code': 'KIMI_CODE_HOME',
     }[host];
-    base = expandPath(process.env[env] || `~/${folders[host]}`);
+    base = expandPath((env && process.env[env]) || `~/${folders[host]}`);
   }
   const target = path.join(base, 'agents');
   if (stat(base)?.isSymbolicLink() || stat(target)?.isSymbolicLink())

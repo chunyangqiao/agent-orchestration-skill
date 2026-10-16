@@ -107,6 +107,20 @@ test('Kimi adjustments select model-effort aliases and show manual host setup', 
   assert.match(w.output.join('\n'), /secondary_model.default_effort/);
 });
 
+test('Cursor recommended defaults keep model strings and customization skips effort', async (t) => {
+  const recommended = wizard(t, ['', '', '', '2'], 'cursor');
+  assert.equal(await runSetup(recommended.options, recommended.io), 0);
+  assert.deepEqual(readJson(recommended.config), defaultConfig('cursor', 'recommended'));
+  assert.match(recommended.output.join('\n'), /create: crew-reviewer.md/);
+  const custom = wizard(t, ['7', '', '3', 'composer-2.5[fast=true]', '2'], 'cursor');
+  assert.equal(await runSetup(custom.options, custom.io), 0);
+  assert.deepEqual(readJson(custom.config).roles, {
+    reviewer: { model: 'composer-2.5[fast=true]' },
+  });
+  assert.equal(custom.prompts.filter((text) => text.includes('effort')).length, 0);
+  assert.equal(custom.prompts.filter((text) => text.includes('model string')).length, 1);
+});
+
 test('Kimi custom aliases and inherit are supported without synthetic effort fields', async (t) => {
   const w = wizard(t, ['1,7', '', '3', '5', 'existing-pool-alias', '4', '2'], 'kimi-code');
   await runSetup(w.options, w.io);

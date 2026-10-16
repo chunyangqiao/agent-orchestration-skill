@@ -4,7 +4,7 @@
 
 **Version: 2.1.0**
 
-A portable multi-agent orchestration skill for Codex, Claude Code, and Kimi Code, with configurable roles and models.
+A portable multi-agent orchestration skill for Codex, Claude Code, Kimi Code, and Cursor, with configurable roles and models.
 
 Use focused subagents for exploration, research, implementation, browser work, and independent review. The main agent keeps responsibility for task scope, architecture, integration, and final acceptance. Explicit invocation with a concrete task requires at least one real subagent; implicit use remains conditional on the benefit of delegation.
 
@@ -24,8 +24,9 @@ The host runs the agents and controls their permissions. This skill provides coo
 | [Codex](skills/agent-orchestration/references/hosts/codex.md) | TOML | Native model and reasoning-effort fields |
 | [Claude Code](skills/agent-orchestration/references/hosts/claude-code.md) | Markdown with YAML frontmatter | Native model and effort fields |
 | [Kimi Code](skills/agent-orchestration/references/hosts/kimi-code.md) | Markdown with YAML frontmatter | Host model-pool aliases selected at dispatch |
+| [Cursor](skills/agent-orchestration/references/hosts/cursor.md) | Markdown with YAML frontmatter | Model string, including speed and reasoning parameters |
 
-Kimi support targets the Markdown Agent format described in its adapter. Model availability, browser tools, permissions, and profile discovery depend on the installed host and backend; verify them in a live session after setup.
+Kimi support targets the Markdown Agent format described in its adapter. Cursor writes `.cursor/agents/` profiles and keeps speed and reasoning inside the model string. Model availability, browser tools, permissions, and profile discovery depend on the installed host and backend; verify them in a live session after setup.
 
 ## Quick start
 
@@ -89,9 +90,9 @@ pnpm run configure:bootstrap --host codex --scope user --config ~/.config/crew/c
 pnpm run configure:check --config ~/.config/crew/codex.json --scope user
 ```
 
-- Use `claude-code` or `kimi-code` with a separate configuration for those hosts.
+- Use `claude-code`, `kimi-code`, or `cursor` with a separate configuration for those hosts.
 - For a project installation, use `--scope project --root /path/to/project` on both `bootstrap` and `check`.
-- New configurations default to all seven roles, three active children, and inherited host models. Use `--preset recommended` for the bundled Codex or Kimi choices after checking model access. Kimi aliases require [manual model-pool setup](skills/agent-orchestration/references/hosts/kimi-code.md#recommended-model-pool).
+- New configurations default to all seven roles, three active children, and inherited host models. Use `--preset recommended` for the bundled Codex, Kimi, or Cursor choices after checking model access. Kimi aliases require [manual model-pool setup](skills/agent-orchestration/references/hosts/kimi-code.md#recommended-model-pool). Cursor pins are model strings; see the [Cursor adapter](skills/agent-orchestration/references/hosts/cursor.md).
 - Existing configurations are reused unchanged; `--preset` only affects creation. For custom models, role subsets, or concurrency, prepare a source JSON using the [configuration contract](skills/agent-orchestration/references/configuration.md#configuration-contract), then bootstrap it.
 - Preview creates no files or directories. `--apply` writes only the source configuration and managed profiles. Keep the source outside the skill and managed Agent directories. Bootstrap does not copy the skill itself.
 - The JSON result identifies configuration creation/reuse and static check status. `runtime_verified: false` means live host loading and execution still need verification, even after static checks pass.

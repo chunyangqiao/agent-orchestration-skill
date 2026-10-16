@@ -4,7 +4,7 @@
 
 **版本：2.1.0**
 
-面向 Codex、Claude Code 和 Kimi Code 的可移植多智能体编排技能，支持自定义角色和模型。
+面向 Codex、Claude Code、Kimi Code 和 Cursor 的可移植多智能体编排技能，支持自定义角色和模型。
 
 使用职责明确的子智能体完成代码探索、资料研究、实现、浏览器操作和独立审查。主智能体负责控制任务范围、架构设计、结果集成和最终验收。显式调用并提供具体任务时，必须派发至少一个真实子智能体；隐式采用时，仍按委派收益决定是否派发。
 
@@ -24,8 +24,9 @@
 | [Codex](skills/agent-orchestration/references/hosts/codex.md) | TOML | 原生模型和推理强度字段 |
 | [Claude Code](skills/agent-orchestration/references/hosts/claude-code.md) | 带 YAML frontmatter 的 Markdown | 原生模型和思考强度字段 |
 | [Kimi Code](skills/agent-orchestration/references/hosts/kimi-code.md) | 带 YAML frontmatter 的 Markdown | 派发任务时选择宿主模型池中的别名 |
+| [Cursor](skills/agent-orchestration/references/hosts/cursor.md) | 带 YAML frontmatter 的 Markdown | 模型字符串，其中包含速度和思考强度参数 |
 
-Kimi 支持以其适配文档描述的 Markdown Agent 格式为目标。模型可用性、浏览器工具、权限及配置发现机制取决于已安装的宿主和后端；完成配置后，请在实际会话中验证。
+Kimi 支持以其适配文档描述的 Markdown Agent 格式为目标。Cursor 把角色配置写入 `.cursor/agents/`，速度和思考强度写在模型字符串里。模型可用性、浏览器工具、权限及配置发现机制取决于已安装的宿主和后端；完成配置后，请在实际会话中验证。
 
 ## 快速开始
 
@@ -88,9 +89,9 @@ pnpm run configure:bootstrap --host codex --scope user --config ~/.config/crew/c
 pnpm run configure:check --config ~/.config/crew/codex.json --scope user
 ```
 
-- 其他宿主使用 `claude-code` 或 `kimi-code`，并分别保存独立配置。
+- 其他宿主使用 `claude-code`、`kimi-code` 或 `cursor`，并分别保存独立配置。
 - 项目级安装需在 `bootstrap` 和 `check` 命令中同时使用 `--scope project --root /path/to/project`。
-- 新配置默认启用全部七种角色，最多同时运行三个子智能体，并继承宿主模型。确认模型访问权限后，可使用 `--preset recommended` 选用内置的 Codex 或 Kimi 模型方案。Kimi 别名需要[手动配置模型池](skills/agent-orchestration/references/hosts/kimi-code.md#recommended-model-pool)。
+- 新配置默认启用全部七种角色，最多同时运行三个子智能体，并继承宿主模型。确认模型访问权限后，可使用 `--preset recommended` 选用内置的 Codex、Kimi 或 Cursor 模型方案。Kimi 别名需要[手动配置模型池](skills/agent-orchestration/references/hosts/kimi-code.md#recommended-model-pool)。Cursor 的钉选是模型字符串，见 [Cursor 适配说明](skills/agent-orchestration/references/hosts/cursor.md)。
 - 已有配置会原样复用；`--preset` 仅在创建配置时生效。如需自定义模型、角色子集或并发数，请先按照[配置约定](skills/agent-orchestration/references/configuration.md#configuration-contract)准备源 JSON 配置，再执行引导安装。
 - 预览不会创建文件或目录。`--apply` 只写入源配置和托管的角色配置。源配置应保存在技能目录及托管 Agent 目录之外。引导命令不会复制技能本身。
 - JSON 结果会标明配置是新建还是复用，以及静态检查状态。`runtime_verified: false` 表示仍需验证宿主是否实际加载并执行配置，即使静态检查已经通过。

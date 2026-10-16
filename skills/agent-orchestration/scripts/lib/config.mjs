@@ -4,7 +4,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 export const SKILL_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-export const HOSTS = ['codex', 'claude-code', 'kimi-code'];
+export const HOSTS = ['codex', 'claude-code', 'kimi-code', 'cursor'];
 export const MANIFEST = '.crew-install.json';
 export const RUNTIME = '.crew-runtime.json';
 export const EFFORTS = {
@@ -95,6 +95,8 @@ export function validate(config) {
         throw new ConfigError(
           'Kimi effort is selected through host model-pool variants; configure a model alias instead',
         );
+      if (host === 'cursor')
+        throw new ConfigError('Cursor effort belongs in the model string; see the Cursor adapter');
       if (!EFFORTS[host].includes(options.effort))
         throw new ConfigError(`Unsupported ${host} effort for ${role}`);
     }
@@ -102,6 +104,10 @@ export function validate(config) {
       if (host === 'codex')
         throw new ConfigError(
           'Codex tools allowlists are not supported by this adapter; use host configuration',
+        );
+      if (host === 'cursor')
+        throw new ConfigError(
+          'Cursor has no tool allowlist; read-only roles use readonly. See the Cursor adapter',
         );
       const items = options.tools;
       if (!Array.isArray(items) || items.some((item) => typeof item !== 'string' || !item)) {
@@ -183,6 +189,13 @@ export function render(config) {
       files[`${name}.toml`] = Object.entries(values)
         .map(([key, value]) => `${key} = ${flow(value)}\n`)
         .join('');
+    } else if (host === 'cursor') {
+      if (model !== 'inherit') values.model = model;
+      if (definition.access === 'read-only') values.readonly = true;
+      const header = Object.entries(values)
+        .map(([key, value]) => `${key}: ${flow(value)}\n`)
+        .join('');
+      files[`${name}.md`] = `---\n${header}---\n\n${prompt}`;
     } else {
       values.tools = options.tools ?? defaultTools(host, role, definition.access);
       if (host === 'claude-code') {

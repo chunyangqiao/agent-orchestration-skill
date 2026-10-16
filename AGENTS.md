@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Agent Orchestration coordinates subagents and generates profiles for Codex, Claude Code, and Kimi Code.
+Agent Orchestration coordinates subagents and generates profiles for Codex, Claude Code, Kimi Code, and Cursor.
 
 The complete installable skill lives in `skills/agent-orchestration/`. Paths in the following skill inventory are relative to that directory:
 

@@ -304,6 +304,8 @@ test('duplicate JSON keys include nested and escaped keys but allow separate obj
 test('invalid configs and unsupported options fail', () => {
   const cases = [
     ['kimi-code', { effort: 'high' }],
+    ['cursor', { effort: 'high' }],
+    ['cursor', { tools: ['Read'] }],
     ['codex', { tools: ['Read'] }],
     ['claude-code', { effort: 'invented' }],
     ['claude-code', { tools: ['Bash'] }],
@@ -418,6 +420,41 @@ test('presets and Kimi snippets preserve alias/model/effort mapping without host
   assert.equal(hostSetup(defaultConfig('kimi-code')), undefined);
 });
 
+test('Cursor recommended profiles pin model strings and readonly access', () => {
+  const config = defaultConfig('cursor', 'recommended');
+  const expected = {
+    explorer: 'grok-4.5[effort=medium,fast=false]',
+    'docs-researcher': 'grok-4.7[reasoning_effort=high]',
+    'browser-debugger': 'grok-4.6[effort=high]',
+    executor: 'composer-2.5[fast=true]',
+    'ui-styler': 'composer-2.5[fast=true]',
+    implementer: 'grok-4.7[reasoning_effort=high]',
+    reviewer: 'grok-4.7[reasoning_effort=high]',
+  };
+  const files = render(config);
+  for (const [role, model] of Object.entries(expected)) {
+    const parsed = yaml(files[`crew-${role}.md`].split('---\n')[1]);
+    assert.equal(parsed.name, `crew-${role}`);
+    assert.equal(parsed.model, model);
+    assert.equal(parsed.readonly, catalog()[role].access === 'read-only' ? true : undefined);
+    assert.equal(parsed.tools, undefined);
+    assert.equal(parsed.effort, undefined);
+    assert.equal(parsed.is_background, undefined);
+    assert.equal(parsed.subagents, undefined);
+  }
+  const inherited = yaml(render(defaultConfig('cursor'))['crew-explorer.md'].split('---\n')[1]);
+  assert.equal(inherited.model, undefined);
+  assert.equal(inherited.readonly, true);
+  assert.throws(
+    () => validate({ ...config, roles: { reviewer: { model: 'grok-4.7', effort: 'high' } } }),
+    /Cursor effort belongs in the model string/,
+  );
+  assert.throws(
+    () => validate({ ...config, roles: { reviewer: { tools: ['Read'] } } }),
+    /Cursor has no tool allowlist/,
+  );
+});
+
 test('custom home paths and CLI argument boundaries', (t) => {
   const f = fixture(t);
   for (const [host, env] of [
@@ -434,6 +471,14 @@ test('custom home paths and CLI argument boundaries', (t) => {
     assert.equal(JSON.parse(result.stdout).target, path.join(root, 'agents'));
     assert.equal(fs.existsSync(root), false);
   }
+  const cursorHome = path.join(f.root, 'cursor-home');
+  const cursorConfig = path.join(f.root, 'cursor.json');
+  fs.writeFileSync(cursorConfig, jsonText(defaultConfig('cursor')));
+  const cursor = cli(f.root, ['install', '--config', cursorConfig, '--scope', 'user'], 0, SCRIPT, {
+    env: { ...process.env, HOME: cursorHome },
+  });
+  assert.equal(JSON.parse(cursor.stdout).target, path.join(cursorHome, '.cursor', 'agents'));
+  assert.equal(fs.existsSync(cursorHome), false);
   for (const args of [
     ['install', '--config', f.configPath, '--scope', 'project'],
     ['install', '--config', f.configPath, '--scope', 'user', '--root', f.root],

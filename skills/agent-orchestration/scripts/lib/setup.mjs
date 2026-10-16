@@ -24,6 +24,7 @@ export function roleSummary(config) {
     Object.entries(config.roles)
       .map(([role, options]) => {
         const model = options.model ?? 'inherit';
+        if (config.host === 'cursor') return `${role}: ${model}`;
         const variant =
           config.host === 'kimi-code' && Object.hasOwn(models, model) ? models[model] : undefined;
         return `${role}: ${model} / ${variant ? `${variant.model} / ${variant.effort}` : (options.effort ?? 'host effort')}`;
@@ -53,6 +54,13 @@ async function customize(config, selected, q, io) {
         if (selectedModel < aliases.length) options = { model: aliases[selectedModel] };
         else if (selectedModel === aliases.length) options = { model: 'inherit' };
         else options = { model: await q.ask(`${role} model-pool alias`, config.roles[role].model) };
+      } else if (config.host === 'cursor') {
+        options = {
+          model: await q.ask(
+            `${role} model string (or inherit)`,
+            config.roles[role].model ?? 'inherit',
+          ),
+        };
       } else {
         options = {
           model: await q.ask(

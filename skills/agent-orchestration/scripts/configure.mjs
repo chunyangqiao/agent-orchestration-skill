@@ -25,8 +25,9 @@ From another directory, use the absolute path to scripts/configure.mjs.
   node scripts/configure.mjs install --config FILE --scope user|project [--root PATH] [--apply]
   node scripts/configure.mjs check --config FILE --scope user|project [--root PATH]
 
-Hosts: codex, claude-code, kimi-code. Project scope requires --root.
+Hosts: codex, claude-code, kimi-code, cursor. Project scope requires --root.
 init refuses existing files; inherit is the default preset. No Claude recommended preset.
+Cursor speed and reasoning belong in the model string; see the Cursor adapter.
 setup uses an Inquirer terminal wizard; scripts/setup.mjs is its executable shortcut.
 Agents collect choices in conversation and complete bootstrap, without a terminal wizard.
 install previews by default; --apply writes profiles. Kimi model-pool setup stays manual.
