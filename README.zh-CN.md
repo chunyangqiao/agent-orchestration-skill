@@ -12,7 +12,7 @@
 
 - 七种共享角色，为不同宿主生成原生配置。
 - 可配置启用的角色、模型、宿主支持的推理强度，以及并发指导参数。
-- 支持由 AI 智能体完成安装、非交互式引导命令和交互式终端向导。
+- 支持由 AI 智能体在对话中完成安装，以及非交互式引导命令。
 - 支持安装预览、冲突检测和可重复更新，保留无关配置及本地修改过的托管文件。
 
 智能体由宿主运行，权限也由宿主管理。本技能提供协调指令和角色配置生成能力；模型认证和工具访问需在宿主中配置。
@@ -21,12 +21,12 @@
 
 | 宿主 | 生成的配置格式 | 模型选择方式 |
 | --- | --- | --- |
-| [Codex](skills/agent-orchestration/references/hosts/codex.md) | TOML | 原生模型和推理强度字段 |
-| [Claude Code](skills/agent-orchestration/references/hosts/claude-code.md) | 带 YAML frontmatter 的 Markdown | 原生模型和思考强度字段 |
-| [Kimi Code](skills/agent-orchestration/references/hosts/kimi-code.md) | 带 YAML frontmatter 的 Markdown | 派发任务时选择宿主模型池中的别名 |
-| [Cursor](skills/agent-orchestration/references/hosts/cursor.md) | 带 YAML frontmatter 的 Markdown | 模型字符串，其中包含速度和思考强度参数 |
+| [Codex](skills/agent-orchestration/docs/hosts/codex.json) | TOML | 源文件写 `model` 和 `strength`，原生字段来自宿主文件 |
+| [Claude Code](skills/agent-orchestration/docs/hosts/claude-code.json) | 带 YAML frontmatter 的 Markdown | 源文件写 `model` 和 `strength`，原生字段来自宿主文件 |
+| [Kimi Code](skills/agent-orchestration/docs/hosts/kimi-code.json) | 带 YAML frontmatter 的 Markdown | 源文件写 API 模型名和 `strength`，派发卡携带模型池别名 |
+| [Cursor](skills/agent-orchestration/docs/hosts/cursor.json) | 带 YAML frontmatter 的 Markdown | 源文件写模型名和 `strength`，角色文件保存编码后的模型字符串 |
 
-Kimi 支持以其适配文档描述的 Markdown Agent 格式为目标。Cursor 把角色配置写入 `.cursor/agents/`，速度和思考强度写在模型字符串里。模型可用性、浏览器工具、权限及配置发现机制取决于已安装的宿主和后端；完成配置后，请在实际会话中验证。
+Kimi 以 Markdown Agent 为目标。Cursor 把角色配置写入 `.cursor/agents/`。模型可用性、浏览器工具、权限及配置发现取决于已安装的宿主。完成配置后，请在实际会话中验证。
 
 ## 快速开始
 
@@ -36,34 +36,31 @@ Kimi 支持以其适配文档描述的 Markdown Agent 格式为目标。Cursor �
 
 ```text
 请从这个仓库为我当前使用的智能体宿主安装 Agent Orchestration。
-阅读 skills/agent-orchestration/SKILL.md，并按照
-skills/agent-orchestration/references/configuration.md 中的 AI 驱动安装指南操作。
-检查已有配置，展示默认角色和并发数，并一次性询问尚未确定的安装范围和模型选择。
+阅读 skills/agent-orchestration/SKILL.md，并按其安装请求操作。
+检查已有配置，展示默认角色和并发数，并一次性询问尚未确定的安装范围、
+角色，以及每个角色的模型和思考强度。
 然后部署完整技能，预览并应用角色配置，验证安装结果。
 分别报告技能部署、配置静态检查和子智能体实际运行验证的结果；
 如果实际运行验证受阻，请给出明确的下一步操作。
 ```
 
-智能体使用非交互式 CLI 完成已授权的安装，不应只复制技能目录就结束，也不应把终端向导交给你完成剩余配置。完整流程见 [AI 驱动安装](skills/agent-orchestration/references/configuration.md#ai-driven-installation)。
+智能体使用非交互式 CLI 完成已授权的安装，不应只复制技能目录就结束。完整流程见 [SKILL.md](skills/agent-orchestration/SKILL.md)。
 
 配置 CLI 要求 **Node.js 22+**，推荐使用 Node.js 24 LTS。运行命令无需安装依赖或执行构建。
 
 ### 手动安装
 
-克隆或下载仓库，然后通过宿主的技能安装机制部署完整的 `skills/agent-orchestration/` 目录。保留目录名 `agent-orchestration`，包含其中的脚本、资源、参考文档、元数据和许可证。然后在已安装的技能目录中运行终端向导：
+克隆或下载仓库，然后通过宿主的技能安装机制部署完整的 `skills/agent-orchestration/` 目录。保留目录名 `agent-orchestration`，包含其中的脚本、文档、参考资料、元数据和许可证。在已安装的技能目录中预览并应用配置：
 
 ```bash
 node --version
-./scripts/setup.mjs
-# Windows，或复制时未保留可执行权限：
-node scripts/setup.mjs
+node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit
+node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit --apply
 ```
 
-已安装的技能只需要 Node.js；Inquirer 提示组件及其许可证随技能打包，无需 `package.json` 或另行安装依赖。如需从源码仓库配置角色，可在仓库根目录运行 `pnpm run setup` 或 `./skills/agent-orchestration/scripts/setup.mjs`。原有的 `node scripts/configure.mjs setup` 入口仍然可用。
+已安装的技能只需要 Node.js，没有 `package.json`，也不需要安装依赖。从源码仓库配置时，在仓库根目录运行 `pnpm run configure:bootstrap`。如果不想使用预设，让当前宿主里的智能体在对话中收集每个角色的模型和思考强度。保存的配置位于技能目录之外。静态检查通过后仍需验证宿主实际运行。
 
-Inquirer 向导会收集宿主、安装范围、配置路径、角色、并发上限和模型选择。使用方向键导航、空格选择角色；预览变更并确认后才写入，确认默认选择“否”，安装后自动检查保存的文件。确认前可按 Esc、Ctrl-C、Ctrl-D、发送 EOF，或在文本输入中键入 `cancel` 取消。保存的配置位于技能目录之外，以便更新技能时保留你的选择。静态检查通过后仍需验证宿主实际运行。
-
-也可以使用下文的引导命令。让宿主发现技能和安装智能体角色配置，这两步都必须完成。
+让宿主发现技能和安装智能体角色配置，这两步都必须完成。
 
 ### 使用技能
 
@@ -91,8 +88,8 @@ pnpm run configure:check --config ~/.config/crew/codex.json --scope user
 
 - 其他宿主使用 `claude-code`、`kimi-code` 或 `cursor`，并分别保存独立配置。
 - 项目级安装需在 `bootstrap` 和 `check` 命令中同时使用 `--scope project --root /path/to/project`。
-- 新配置默认启用全部七种角色，最多同时运行三个子智能体，并继承宿主模型。确认模型访问权限后，可使用 `--preset recommended` 选用内置的 Codex、Kimi 或 Cursor 模型方案。Kimi 别名需要[手动配置模型池](skills/agent-orchestration/references/hosts/kimi-code.md#recommended-model-pool)。Cursor 的钉选是模型字符串，见 [Cursor 适配说明](skills/agent-orchestration/references/hosts/cursor.md)。
-- 已有配置会原样复用；`--preset` 仅在创建配置时生效。如需自定义模型、角色子集或并发数，请先按照[配置约定](skills/agent-orchestration/references/configuration.md#configuration-contract)准备源 JSON 配置，再执行引导安装。
+- 新配置默认启用全部七种角色，最多同时运行三个子智能体，并继承宿主模型。确认模型访问权限后，可使用 `--preset recommended` 选用内置的 Codex、Kimi 或 Cursor 方案。Kimi 别名以 `host_setup` 输出，由使用者合并进宿主配置。Cursor 的钉选由 `model` 和 `strength` 编码而成，见 [docs/hosts/cursor.json](skills/agent-orchestration/docs/hosts/cursor.json)。
+- 已有配置会原样复用；`--preset` 仅在创建配置时生效。如需自定义模型、角色子集或并发数，让智能体写一份 schema 2 源文件，或自行编辑后再执行引导安装。
 - 预览不会创建文件或目录。`--apply` 只写入源配置和托管的角色配置。源配置应保存在技能目录及托管 Agent 目录之外。引导命令不会复制技能本身。
 - JSON 结果会标明配置是新建还是复用，以及静态检查状态。`runtime_verified: false` 表示仍需验证宿主是否实际加载并执行配置，即使静态检查已经通过。
 
@@ -104,7 +101,6 @@ pnpm run configure:check --config ~/.config/crew/codex.json --scope user
 
 | 命令 | 用途 |
 | --- | --- |
-| `pnpm run setup` | 交互式配置和安装向导 |
 | `pnpm run configure --help` | 查看 CLI 命令和选项 |
 | `pnpm run configure:bootstrap` | 预览配置和角色文件；添加 `--apply` 后保存、安装并检查 |
 | `pnpm run configure:init` | 创建源配置；目标文件已存在时拒绝写入 |
@@ -122,11 +118,11 @@ pnpm run configure:install --config ~/.config/crew/codex.json --scope user --app
 pnpm run configure:check --config ~/.config/crew/codex.json --scope user
 ```
 
-编辑已保存的配置后，重新执行生成、预览、应用和检查步骤。检查成功仅验证已安装文件，不代表宿主已实际加载或执行配置。安装范围和冲突规则见[分步配置](skills/agent-orchestration/references/configuration.md#step-by-step-commands)。
+编辑已保存的配置后，重新执行生成、预览、应用和检查步骤。检查成功仅验证已安装文件，不代表宿主已实际加载或执行配置。项目级和个人级配置是完整的替代关系，不会合并。
 
-仓库中的直接 Node 入口现为 `node skills/agent-orchestration/scripts/configure.mjs <command>`。原根目录下的 `scripts/configure.mjs` 入口已迁移，仓库现有的 `pnpm` 快捷命令名称保持不变。
+仓库中的直接 Node 入口为 `node skills/agent-orchestration/scripts/configure.mjs <command>`。
 
-Agent Orchestration 的旧名称为 Crew。为保持安装兼容性，现有的 `crew-*` 角色配置名、模型别名、状态文件和配置路径继续保留。JSON 格式、安装范围、冲突处理和更新方式见[配置文档](skills/agent-orchestration/references/configuration.md)。
+Agent Orchestration 的旧名称为 Crew。为保持安装兼容性，现有的 `crew-*` 角色配置名、模型别名、状态文件和配置路径继续保留。角色职责在 [docs/roles](skills/agent-orchestration/docs/roles)。宿主链接、限制和推荐模型在 [docs/hosts](skills/agent-orchestration/docs/hosts)。
 
 ## 角色与协作
 
@@ -142,8 +138,8 @@ Agent Orchestration 的旧名称为 Crew。为保持安装兼容性，现有的 
 skills/agent-orchestration/  # 完整的可安装技能
   SKILL.md                  # 协作工作流程
   scripts/                  # 配置 CLI 和运行时模块
-  assets/                   # 角色定义、预设和模型数据
-  references/               # 安装、宿主适配和验证文档
+  docs/                     # 角色职责和宿主事实
+  references/               # 评估和交互式测试
   agents/openai.yaml        # 技能 UI 元数据
   LICENSE                   # 随技能分发的许可证
 tests/                      # 仓库测试和旧版夹具
@@ -160,16 +156,14 @@ pnpm format:check
 pnpm test
 ```
 
-更新 Inquirer 时，运行 `pnpm build:prompts` 并一同提交生成的包和许可证。`pnpm test` 会检查打包产物与锁定依赖是否一致；安装后的用户无需构建。
-
 使用 `pnpm format` 格式化脚本和测试。使用 `pnpm lint-staged` 通过 Oxfmt 格式化暂存的 `.mjs`、JSON 和 YAML 文件，排除锁文件和旧版测试夹具。在 Git 检出目录中，`pnpm prepare` 会启用 Husky 的 pre-commit 钩子，依次执行 `pnpm lint-staged` 和 `pnpm test`。
 
-测试覆盖配置校验、角色配置生成、引导安装预览及安装后检查、安装冲突、幂等性、回滚、向导取消，以及与保存的旧版测试夹具的兼容性。测试也会验证不依赖开发依赖的运行命令。宿主实际运行验收见[评估文档](skills/agent-orchestration/references/evaluation.md)，贡献指南见 [AGENTS.md](AGENTS.md)。
+测试覆盖配置校验、角色配置生成、引导安装预览及安装后检查、安装冲突、幂等性、回滚，以及拒绝已保存的 schema 1 夹具。测试也会验证不依赖开发依赖的运行命令。宿主实际运行验收见[评估文档](skills/agent-orchestration/references/evaluation.md)，贡献指南见 [AGENTS.md](AGENTS.md)。
 
 ## 参考文档
 
-- [配置与安装](skills/agent-orchestration/references/configuration.md)
 - [协作工作流程](skills/agent-orchestration/SKILL.md)
+- [宿主事实](skills/agent-orchestration/docs/hosts)
+- [角色职责](skills/agent-orchestration/docs/roles)
 - [宿主验收与评估](skills/agent-orchestration/references/evaluation.md)
 - [交互式测试](skills/agent-orchestration/references/interactive-testing.md)
-- [角色目录](skills/agent-orchestration/assets/roles.json)

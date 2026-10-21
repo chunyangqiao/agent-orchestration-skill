@@ -1,0 +1,61 @@
+{
+  "title": "Cursor",
+  "checked": "2026-10-17",
+  "official": [
+    { "title": "Subagents", "url": "https://cursor.com/docs/subagents" },
+    { "title": "Grok 4.7", "url": "https://cursor.com/docs/models/grok-4-7" },
+    { "title": "Grok 4.6", "url": "https://cursor.com/docs/models/grok-4-6" },
+    { "title": "Grok 4.5", "url": "https://cursor.com/docs/models/grok-4-5" },
+    { "title": "Composer 2.5", "url": "https://cursor.com/docs/models/cursor-composer-2-5" }
+  ],
+  "limits": [
+    "Plus and the legacy Start plan (India only) fix Grok at medium effort and standard speed, with Grok 4.7 on the 256k window. A task card that disagrees with pinned_model is a mismatch.",
+    "This host also loads .claude/agents/ and .codex/agents/. This skill writes only the agents directory from paths. On a name conflict, .cursor/ wins."
+  ],
+  "paths": {
+    "project_dir": ".cursor",
+    "user_dir": ".cursor",
+    "env_home": null,
+    "agents": "agents",
+    "skill": "skills/agent-orchestration"
+  },
+  "encode": {
+    "kind": "model_suffix",
+    "families": {
+      "grok-4.7": {
+        "wire": "reasoning_effort",
+        "strengths": ["low", "medium", "high", "xhigh"],
+        "confirmed": "2026-10-01"
+      },
+      "grok-4.6": {
+        "wire": "effort",
+        "strengths": ["low", "medium", "high"]
+      },
+      "grok-4.5": {
+        "wire": "effort",
+        "strengths": ["low", "medium", "high"],
+        "fixed": { "fast": false }
+      },
+      "composer-2.5": { "fixed": { "fast": true } }
+    }
+  },
+  "profile": {
+    "format": "markdown",
+    "model_key": "model",
+    "effort_key": null,
+    "body_key": null,
+    "access_key": null,
+    "readonly_key": "readonly",
+    "tools_key": null
+  },
+  "tools": { "allowlist": false, "needs": {} },
+  "recommended": {
+    "explorer": { "model": "grok-4.5", "strength": "medium" },
+    "docs-researcher": { "model": "grok-4.7", "strength": "high" },
+    "browser-debugger": { "model": "grok-4.6", "strength": "high" },
+    "executor": { "model": "composer-2.5" },
+    "ui-styler": { "model": "composer-2.5" },
+    "implementer": { "model": "grok-4.7", "strength": "high" },
+    "reviewer": { "model": "grok-4.7", "strength": "high" }
+  }
+}

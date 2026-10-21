@@ -12,7 +12,7 @@ Use focused subagents for exploration, research, implementation, browser work, a
 
 - Seven shared roles with host-specific native profiles.
 - Configurable role selection, models, supported reasoning levels, and concurrency guidance.
-- AI-driven installation, a non-interactive bootstrap command, and an interactive terminal wizard.
+- AI-driven installation and a non-interactive bootstrap command.
 - Installation previews, conflict detection, and repeatable updates that preserve unrelated profiles and locally edited managed files.
 
 The host runs the agents and controls their permissions. This skill provides coordination instructions and profile generation; model authentication and tool access are configured in the host.
@@ -21,12 +21,12 @@ The host runs the agents and controls their permissions. This skill provides coo
 
 | Host | Generated profiles | Model selection |
 | --- | --- | --- |
-| [Codex](skills/agent-orchestration/references/hosts/codex.md) | TOML | Native model and reasoning-effort fields |
-| [Claude Code](skills/agent-orchestration/references/hosts/claude-code.md) | Markdown with YAML frontmatter | Native model and effort fields |
-| [Kimi Code](skills/agent-orchestration/references/hosts/kimi-code.md) | Markdown with YAML frontmatter | Host model-pool aliases selected at dispatch |
-| [Cursor](skills/agent-orchestration/references/hosts/cursor.md) | Markdown with YAML frontmatter | Model string, including speed and reasoning parameters |
+| [Codex](skills/agent-orchestration/docs/hosts/codex.json) | TOML | Source `model` and `strength`; native fields come from the host file |
+| [Claude Code](skills/agent-orchestration/docs/hosts/claude-code.json) | Markdown with YAML frontmatter | Source `model` and `strength`; native fields come from the host file |
+| [Kimi Code](skills/agent-orchestration/docs/hosts/kimi-code.json) | Markdown with YAML frontmatter | Source API id and `strength`; the dispatch card carries the pool alias |
+| [Cursor](skills/agent-orchestration/docs/hosts/cursor.json) | Markdown with YAML frontmatter | Source model id and `strength`; the profile stores the encoded model string |
 
-Kimi support targets the Markdown Agent format described in its adapter. Cursor writes `.cursor/agents/` profiles and keeps speed and reasoning inside the model string. Model availability, browser tools, permissions, and profile discovery depend on the installed host and backend; verify them in a live session after setup.
+Kimi support targets Markdown agents. Cursor writes `.cursor/agents/` profiles. Model availability, browser tools, permissions, and profile discovery depend on the installed host. Verify them in a live session after configuration.
 
 ## Quick start
 
@@ -36,35 +36,32 @@ Give your agent the repository URL or local checkout path and this request:
 
 ```text
 Install Agent Orchestration from this repository for my current agent host.
-Read skills/agent-orchestration/SKILL.md and follow the AI-driven installation
-guide in skills/agent-orchestration/references/configuration.md.
-Inspect existing choices and ask once for unresolved scope and model choices,
-showing the default roles and concurrency. Then deploy the complete skill,
-preview and apply the profiles, and verify the installation.
-Report skill deployment, static profile checks, and live subagent verification
-separately; if live verification is blocked, give the exact next step.
+Read skills/agent-orchestration/SKILL.md and follow its installation requests.
+Inspect existing choices and ask once for unresolved scope, roles, and each
+role's model and thinking strength, showing the default roles and concurrency.
+Then deploy the complete skill, preview and apply the profiles, and verify
+the installation. Report skill deployment, static profile checks, and live
+subagent verification separately; if live verification is blocked, give the
+exact next step.
 ```
 
-The agent completes the authorized installation using the non-interactive CLI. It should not stop after copying the skill folder or hand you the terminal wizard to finish the remaining setup. See [AI-driven installation](skills/agent-orchestration/references/configuration.md#ai-driven-installation) for the complete workflow.
+The agent completes the authorized installation using the non-interactive CLI. It should not stop after copying the skill folder. See [SKILL.md](skills/agent-orchestration/SKILL.md) for the installation requests.
 
 The configuration CLI requires **Node.js 22+**; Node.js 24 LTS is recommended. Runtime commands need no package installation or build step.
 
 ### Manual installation
 
-Clone or download this repository, then deploy the complete `skills/agent-orchestration/` directory through your host's skill installation mechanism. Keep its directory name as `agent-orchestration` and include its scripts, assets, references, metadata, and license. From the installed skill directory, run the terminal wizard:
+Clone or download this repository, then deploy the complete `skills/agent-orchestration/` directory through your host's skill installation mechanism. Keep its directory name as `agent-orchestration` and include its scripts, docs, references, metadata, and license. From the installed skill directory, preview and apply a configuration:
 
 ```bash
 node --version
-./scripts/setup.mjs
-# Windows, or if executable permissions were not preserved:
-node scripts/setup.mjs
+node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit
+node scripts/configure.mjs bootstrap --host codex --scope user --config ~/.config/crew/codex.json --preset inherit --apply
 ```
 
-The installed skill needs only Node.js; Inquirer prompts and their licenses are bundled, with no `package.json` or dependency installation required. To configure profiles from a source checkout instead, run `pnpm run setup` or `./skills/agent-orchestration/scripts/setup.mjs` from the repository root. The existing `node scripts/configure.mjs setup` entrypoint also works.
+The installed skill needs only Node.js. There is no `package.json` and no dependency installation. To configure profiles from a source checkout, run the same `bootstrap` command through `pnpm run configure:bootstrap` from the repository root. Ask the host's agent to collect model and thinking-strength choices in conversation when you do not want the preset. Saved configurations remain outside the skill directory. Static success still requires a live host probe.
 
-The Inquirer wizard collects the host, installation scope, configuration path, roles, concurrency limit, and model choices. Use arrow keys to navigate and Space to select roles. It previews changes and asks for confirmation (default: no), then installs and checks the saved files. Before confirmation, press Esc, Ctrl-C, Ctrl-D, send EOF, or type `cancel` in a text input to stop. Saved configurations remain outside the skill directory so updates preserve your choices. Static success still requires a live host probe.
-
-Alternatively, use the bootstrap command below. Making the skill discoverable and installing its agent profiles are both required.
+Making the skill discoverable and installing its agent profiles are both required.
 
 ### Use the skill
 
@@ -92,8 +89,8 @@ pnpm run configure:check --config ~/.config/crew/codex.json --scope user
 
 - Use `claude-code`, `kimi-code`, or `cursor` with a separate configuration for those hosts.
 - For a project installation, use `--scope project --root /path/to/project` on both `bootstrap` and `check`.
-- New configurations default to all seven roles, three active children, and inherited host models. Use `--preset recommended` for the bundled Codex, Kimi, or Cursor choices after checking model access. Kimi aliases require [manual model-pool setup](skills/agent-orchestration/references/hosts/kimi-code.md#recommended-model-pool). Cursor pins are model strings; see the [Cursor adapter](skills/agent-orchestration/references/hosts/cursor.md).
-- Existing configurations are reused unchanged; `--preset` only affects creation. For custom models, role subsets, or concurrency, prepare a source JSON using the [configuration contract](skills/agent-orchestration/references/configuration.md#configuration-contract), then bootstrap it.
+- New configurations default to all seven roles, three active children, and inherited host models. Use `--preset recommended` for the bundled Codex, Kimi, or Cursor choices after checking model access. Kimi aliases are printed as `host_setup` for a manual merge into the host config. Cursor pins are encoded from `model` and `strength` in [docs/hosts/cursor.json](skills/agent-orchestration/docs/hosts/cursor.json).
+- Existing configurations are reused unchanged; `--preset` only affects creation. For custom models, role subsets, or concurrency, ask the agent to write a schema 2 source file, or edit one yourself, then bootstrap it.
 - Preview creates no files or directories. `--apply` writes only the source configuration and managed profiles. Keep the source outside the skill and managed Agent directories. Bootstrap does not copy the skill itself.
 - The JSON result identifies configuration creation/reuse and static check status. `runtime_verified: false` means live host loading and execution still need verification, even after static checks pass.
 
@@ -105,7 +102,6 @@ In an installed skill directory, use `node scripts/configure.mjs <command>` inst
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm run setup` | Interactive configuration and installation wizard |
 | `pnpm run configure --help` | Show CLI commands and options |
 | `pnpm run configure:bootstrap` | Preview configuration and profiles; add `--apply` to save, install, and check |
 | `pnpm run configure:init` | Create a source configuration; refuses an existing file |
@@ -123,11 +119,11 @@ pnpm run configure:install --config ~/.config/crew/codex.json --scope user --app
 pnpm run configure:check --config ~/.config/crew/codex.json --scope user
 ```
 
-After editing a saved configuration, repeat the render, preview, apply, and check steps. A successful check verifies installed files, not live host loading or execution. See [step-by-step configuration](skills/agent-orchestration/references/configuration.md#step-by-step-commands) for scope and conflict rules.
+After editing a saved configuration, repeat the render, preview, apply, and check steps. A successful check verifies installed files, not live host loading or execution. Project and user scopes are complete alternatives and are not merged.
 
-The repository's direct Node entrypoint is now `node skills/agent-orchestration/scripts/configure.mjs <command>`. The former root-level `scripts/configure.mjs` entrypoint has moved; existing repository `pnpm` shortcut names are unchanged.
+The repository's direct Node entrypoint is `node skills/agent-orchestration/scripts/configure.mjs <command>`.
 
-Agent Orchestration was previously named Crew. Existing `crew-*` profile and model alias names, state files, and configuration paths are retained for installation compatibility. See [configuration](skills/agent-orchestration/references/configuration.md) for the JSON schema, scopes, conflict handling, and updates.
+Agent Orchestration was previously named Crew. Existing `crew-*` profile and model alias names, state files, and configuration paths are retained for installation compatibility. Role duties live in [docs/roles](skills/agent-orchestration/docs/roles). Host links, limits, and recommended pins live in [docs/hosts](skills/agent-orchestration/docs/hosts).
 
 ## Roles and coordination
 
@@ -143,8 +139,8 @@ The repository separates the installable skill from development tooling:
 skills/agent-orchestration/  # Complete installable skill
   SKILL.md                  # Coordination workflow
   scripts/                  # Configuration CLI and runtime modules
-  assets/                   # Role definitions, presets, and model data
-  references/               # Installation, host adapters, and verification
+  docs/                     # Role duties and host facts
+  references/               # Evaluation and interactive testing
   agents/openai.yaml        # Skill UI metadata
   LICENSE                   # License included with the skill
 tests/                      # Repository tests and legacy fixtures
@@ -161,16 +157,14 @@ pnpm format:check
 pnpm test
 ```
 
-When updating Inquirer, run `pnpm build:prompts` and include the generated bundle and licenses. `pnpm test` checks that this bundle matches the locked dependencies; installed users need no build step.
-
 Use `pnpm format` to format scripts and tests. Use `pnpm lint-staged` to format staged `.mjs`, JSON, and YAML files with Oxfmt; the lockfile and legacy fixtures are excluded. In a Git checkout, `pnpm prepare` enables the Husky pre-commit hook, which runs `pnpm lint-staged` followed by `pnpm test`.
 
-Tests cover configuration validation, profile generation, bootstrap previews and post-install checks, installation conflicts, idempotency, rollback, wizard cancellation, and compatibility with captured legacy fixtures. Runtime commands are also exercised without development dependencies. See [evaluation](skills/agent-orchestration/references/evaluation.md) for live host acceptance checks and [AGENTS.md](AGENTS.md) for contribution guidelines.
+Tests cover configuration validation, profile generation, bootstrap previews and post-install checks, installation conflicts, idempotency, rollback, and rejection of captured schema 1 fixtures. Runtime commands are also exercised without development dependencies. See [evaluation](skills/agent-orchestration/references/evaluation.md) for live host acceptance checks and [AGENTS.md](AGENTS.md) for contribution guidelines.
 
 ## Reference
 
-- [Configuration and installation](skills/agent-orchestration/references/configuration.md)
 - [Coordination workflow](skills/agent-orchestration/SKILL.md)
+- [Host facts](skills/agent-orchestration/docs/hosts)
+- [Role duties](skills/agent-orchestration/docs/roles)
 - [Host acceptance and evaluation](skills/agent-orchestration/references/evaluation.md)
 - [Interactive testing](skills/agent-orchestration/references/interactive-testing.md)
-- [Role catalog](skills/agent-orchestration/assets/roles.json)

@@ -8,13 +8,16 @@ import { parse as toml } from 'smol-toml';
 import { parse as yaml } from 'yaml';
 import { assertNodeVersion } from '../skills/agent-orchestration/scripts/configure.mjs';
 import {
-  catalog,
+  hostIds,
+  loadCommon,
+  loadHost,
+  loadRoles,
+} from '../skills/agent-orchestration/scripts/lib/docs.mjs';
+import {
   ConfigError,
   defaultConfig,
-  HOSTS,
   hostSetup,
   jsonText,
-  kimiModels,
   MANIFEST,
   parseJson,
   readJson,
@@ -53,7 +56,7 @@ function fixture(t, host = 'codex') {
   };
 }
 
-for (const host of HOSTS) {
+for (const host of hostIds()) {
   test(`${host}: init, render, preview, install, check and repeat install`, (t) => {
     const root = temporary(t);
     const config = path.join(root, 'choices.json');
@@ -82,64 +85,34 @@ for (const host of HOSTS) {
     for (const preset of host === 'claude-code' ? ['inherit'] : ['inherit', 'recommended']) {
       const config = defaultConfig(host, preset);
       const files = render(config);
-      for (const [role, definition] of Object.entries(catalog())) {
+      for (const [role, definition] of Object.entries(loadRoles())) {
         const filename = `crew-${role}${host === 'codex' ? '.toml' : '.md'}`;
         const text = files[filename];
         const parsed = host === 'codex' ? toml(text) : yaml(text.split('---\n')[1]);
         assert.equal(parsed.name, `crew-${role}`);
         assert.equal(parsed.description, definition.description);
-        const prompt =
-          fs.readFileSync(path.join(SKILL_ROOT, `assets/roles/${role}.md`), 'utf8').trim() +
-          '\n\n' +
-          fs.readFileSync(path.join(SKILL_ROOT, 'assets/roles/common.md'), 'utf8').trim() +
-          '\n';
+        const prompt = `${definition.duty.trim()}\n\nAccess: ${definition.access}.\n\n${loadCommon().trim()}\n`;
+        if (host === 'codex') assert.equal(parsed.developer_instructions, prompt);
+        else assert.equal(text.slice(text.indexOf('\n---\n') + 6), prompt);
+        const card = JSON.parse(files[RUNTIME]).roles[role];
+        assert.equal(parsed.model, card.pinned_model ?? undefined);
         if (host === 'codex') {
-          assert.equal(parsed.developer_instructions, prompt);
           assert.equal(parsed.sandbox_mode, definition.access);
-          assert.equal(parsed.model_reasoning_effort, config.roles[role].effort);
-        } else assert.equal(text.slice(text.indexOf('\n---\n') + 6), prompt);
+          assert.equal(parsed.model_reasoning_effort, card.pinned_effort ?? undefined);
+        }
         if (host === 'kimi-code') {
-          assert.equal(parsed.model, undefined);
           assert.equal(parsed.effort, undefined);
           assert.deepEqual(parsed.subagents, []);
-        } else
-          assert.equal(
-            parsed.model,
-            config.roles[role].model === 'inherit' ? undefined : config.roles[role].model,
-          );
+        }
+        if (host === 'claude-code') assert.deepEqual(parsed.disallowedTools, ['Agent']);
       }
     }
   });
 }
 
 for (const old of readJson(path.join(REPO_ROOT, 'tests/fixtures/python-v1.json'))) {
-  test(`Python v1 ${old.host}/${old.variant}: byte parity and installed manifest compatibility`, (t) => {
-    const f = fixture(t, old.host);
-    f.save(old.config);
-    assert.deepEqual(render(old.config), old.files);
-    fs.mkdirSync(f.target, { recursive: true });
-    for (const [name, body] of Object.entries(old.files))
-      fs.writeFileSync(path.join(f.target, name), body);
-    fs.writeFileSync(path.join(f.target, MANIFEST), old.manifest);
-    f.command('check');
-    const before = snapshot(f.target, true);
-    f.command('install', ['--apply']);
-    assert.deepEqual(snapshot(f.target, true), before);
-    const config = structuredClone(old.config);
-    config.roles = { reviewer: { model: 'changed-model' } };
-    f.save(config);
-    f.command('install', ['--apply']);
-    f.command('check');
-    const profile = path.join(f.target, `crew-reviewer${old.host === 'codex' ? '.toml' : '.md'}`);
-    fs.unlinkSync(profile);
-    f.command('check', [], 1);
-    f.command('install', ['--apply']);
-    assert.ok(fs.existsSync(profile));
-    fs.writeFileSync(profile, 'local edit');
-    const edited = snapshot(f.target);
-    f.save({ ...config, roles: {} });
-    f.command('install', ['--apply'], 1);
-    assert.deepEqual(snapshot(f.target), edited);
+  test(`Python v1 ${old.host}/${old.variant} is rejected`, () => {
+    assert.throws(() => validate(old.config), /schema_version must be 2/);
   });
 }
 
@@ -171,7 +144,7 @@ test('unrelated profiles/settings survive updates and disabling all roles', (t) 
   const settings = path.join(f.target, '..', 'config.toml');
   fs.writeFileSync(unrelated, 'keep');
   fs.writeFileSync(settings, 'host settings');
-  f.config.roles = { reviewer: { model: 'custom', effort: 'high' } };
+  f.config.roles = { reviewer: { model: 'custom', strength: 'high' } };
   f.save();
   f.command('install', ['--apply']);
   assert.deepEqual(
@@ -249,7 +222,7 @@ test('write failure restores updates and removed profiles', (t) => {
   const f = fixture(t);
   f.command('install', ['--apply']);
   const before = snapshot(f.target);
-  f.config.roles = { reviewer: { model: 'new-model' } };
+  f.config.roles = { reviewer: { model: 'new-model', strength: 'high' } };
   const files = render(f.config);
   let calls = 0;
   const write = (file, body) => {
@@ -270,7 +243,7 @@ test('write failure restores updates and removed profiles', (t) => {
 test('rollback failure reports files requiring recovery', (t) => {
   const f = fixture(t);
   f.command('install', ['--apply']);
-  f.config.roles = { reviewer: { model: 'new-model' } };
+  f.config.roles = { reviewer: { model: 'new-model', strength: 'high' } };
   const files = render(f.config);
   let calls = 0;
   const write = (file, body) => {
@@ -342,7 +315,9 @@ test('invalid configs and unsupported options fail', () => {
   assert.throws(
     () =>
       validate(
-        JSON.parse('{"schema_version":1,"host":"codex","max_parallel":3,"roles":{"__proto__":{}}}'),
+        JSON.parse(
+          '{"schema_version":2,"host":"codex","max_parallel":3,"roles":{"__proto__":{"model":"inherit"}}}',
+        ),
       ),
     /Unknown roles/,
   );
@@ -362,8 +337,8 @@ test('tool overrides replace defaults; browser roles remain read-only', () => {
       'Grep',
     ]);
     config.roles = {
-      'browser-debugger': { tools: ['Read', 'mcp__browser__*'] },
-      reviewer: { tools: [] },
+      'browser-debugger': { model: 'inherit', tools: ['Read', 'mcp__browser__*'] },
+      reviewer: { model: 'inherit', tools: [] },
     };
     assert.deepEqual(parse(render(config)['crew-browser-debugger.md']).tools, [
       'Read',
@@ -372,17 +347,21 @@ test('tool overrides replace defaults; browser roles remain read-only', () => {
     assert.deepEqual(parse(render(config)['crew-reviewer.md']).tools, []);
     for (const tool of ['Write', 'Edit', 'Bash'])
       assert.throws(
-        () => validate({ ...config, roles: { 'browser-debugger': { tools: [tool] } } }),
+        () =>
+          validate({
+            ...config,
+            roles: { 'browser-debugger': { model: 'inherit', tools: [tool] } },
+          }),
         ConfigError,
       );
   }
 });
 
-test('presets and Kimi snippets preserve alias/model/effort mapping without host writes', (t) => {
+test('presets and Kimi snippets preserve alias/model/strength mapping without host writes', (t) => {
   const config = defaultConfig('codex', 'recommended');
-  assert.deepEqual(config.roles.reviewer, { model: 'gpt-6-astra', effort: 'high' });
-  assert.deepEqual(config.roles['browser-debugger'], { model: 'gpt-6.1-sol', effort: 'high' });
-  assert.deepEqual(config.roles['ui-styler'], { model: 'gpt-6.1-sol', effort: 'medium' });
+  assert.deepEqual(config.roles.reviewer, { model: 'gpt-6-astra', strength: 'high' });
+  assert.deepEqual(config.roles['browser-debugger'], { model: 'gpt-6.1-sol', strength: 'high' });
+  assert.deepEqual(config.roles['ui-styler'], { model: 'gpt-6.1-sol', strength: 'medium' });
   assert.throws(() => defaultConfig('claude-code', 'recommended'), /No recommended/);
   config.roles.reviewer.model = 'local';
   assert.equal(defaultConfig('codex', 'recommended').roles.reviewer.model, 'gpt-6-astra');
@@ -393,16 +372,25 @@ test('presets and Kimi snippets preserve alias/model/effort mapping without host
   const snippet = toml(rendered.host_setup.content);
   assert.equal(snippet.secondary_model.default_effort, undefined);
   assert.equal(snippet.secondary_model.force, undefined);
-  for (const [alias, expected] of Object.entries(kimiModels())) {
+  const expected = {
+    'crew-kimi-coding-low': { model: 'kimi-for-coding', effort: 'low' },
+    'crew-kimi-coding-high': { model: 'kimi-for-coding', effort: 'high' },
+    'crew-kimi-k3-high': { model: 'k3-256k', effort: 'high' },
+  };
+  for (const [alias, spec] of Object.entries(expected)) {
     const entry = snippet.models[alias];
     assert.equal(entry.provider, 'managed:kimi-code');
-    assert.equal(entry.model, expected.model);
-    assert.equal(entry.overrides.default_effort, expected.effort);
-    assert.ok(entry.support_efforts.includes(expected.effort));
+    assert.equal(entry.model, spec.model);
+    assert.equal(entry.overrides.default_effort, spec.effort);
+    assert.ok(entry.support_efforts.includes(spec.effort));
     assert.ok(snippet.secondary_model.models[alias]);
     assert.equal(entry.api_key, undefined);
   }
   assert.equal(snippet.models['crew-kimi-k3-high'].capabilities.includes('video_in'), false);
+  const card = JSON.parse(render(kimi)[RUNTIME]);
+  assert.equal(card.roles.implementer.spawn, 'crew-kimi-k3-high');
+  assert.equal(card.roles.implementer.pinned_model, null);
+  assert.equal(yaml(render(kimi)['crew-implementer.md'].split('---\n')[1]).model, undefined);
   const home = path.join(f.root, 'kimi-home');
   fs.mkdirSync(home);
   fs.writeFileSync(path.join(home, 'config.toml'), 'existing host settings');
@@ -436,7 +424,7 @@ test('Cursor recommended profiles pin model strings and readonly access', () => 
     const parsed = yaml(files[`crew-${role}.md`].split('---\n')[1]);
     assert.equal(parsed.name, `crew-${role}`);
     assert.equal(parsed.model, model);
-    assert.equal(parsed.readonly, catalog()[role].access === 'read-only' ? true : undefined);
+    assert.equal(parsed.readonly, loadRoles()[role].access === 'read-only' ? true : undefined);
     assert.equal(parsed.tools, undefined);
     assert.equal(parsed.effort, undefined);
     assert.equal(parsed.is_background, undefined);
@@ -447,11 +435,32 @@ test('Cursor recommended profiles pin model strings and readonly access', () => 
   assert.equal(inherited.readonly, true);
   assert.throws(
     () => validate({ ...config, roles: { reviewer: { model: 'grok-4.7', effort: 'high' } } }),
-    /Cursor effort belongs in the model string/,
+    /Unknown reviewer fields: effort/,
   );
   assert.throws(
-    () => validate({ ...config, roles: { reviewer: { tools: ['Read'] } } }),
+    () => validate({ ...config, roles: { reviewer: { model: 'inherit', tools: ['Read'] } } }),
     /Cursor has no tool allowlist/,
+  );
+  const pinned = validate({
+    ...config,
+    roles: { reviewer: { model: 'grok-4.7', strength: 'high' } },
+  });
+  assert.equal(
+    yaml(render(pinned)['crew-reviewer.md'].split('---\n')[1]).model,
+    'grok-4.7[reasoning_effort=high]',
+  );
+  assert.equal(JSON.parse(render(pinned)[RUNTIME]).roles.reviewer.spawn, null);
+  assert.throws(
+    () =>
+      validate({
+        ...config,
+        roles: { reviewer: { model: 'grok-4.7[reasoning_effort=high]' } },
+      }),
+    /brackets/,
+  );
+  assert.throws(
+    () => validate({ ...config, roles: { executor: { model: 'composer-2.5', strength: 'high' } } }),
+    /does not take a thinking strength/,
   );
 });
 
@@ -511,7 +520,7 @@ test('version gate runs before file writes', (t) => {
   assert.equal(fs.existsSync(config), false);
 });
 
-for (const host of HOSTS) {
+for (const host of hostIds()) {
   test(`${host}: complete standalone skill runs init, render and installation without repository dependencies`, (t) => {
     const root = temporary(t);
     const skill = path.join(root, 'standalone-skill');
@@ -544,12 +553,23 @@ for (const host of HOSTS) {
   });
 }
 
-test('role catalog and source files match', () => {
+test('role files and host prose have one owner', () => {
   const roles = fs
-    .readdirSync(path.join(SKILL_ROOT, 'assets/roles'))
-    .filter((name) => name.endsWith('.md') && name !== 'common.md')
+    .readdirSync(path.join(SKILL_ROOT, 'docs/roles'))
+    .filter((name) => name.endsWith('.md'))
     .map((name) => name.slice(0, -3));
-  assert.deepEqual(roles.sort(), Object.keys(catalog()).sort());
+  const loaded = loadRoles();
+  assert.deepEqual(roles.sort(), Object.keys(loaded).sort());
+  const skill = fs.readFileSync(path.join(SKILL_ROOT, 'SKILL.md'), 'utf8');
+  for (const role of Object.values(loaded)) {
+    assert.equal(skill.includes(role.description), false);
+    assert.equal(skill.includes(role.delegate_when), false);
+  }
+  assert.equal(skill.includes('reasoning_effort'), false);
+  const cursor = loadHost('cursor');
+  const rendered = JSON.stringify(render(defaultConfig('cursor', 'recommended')));
+  for (const line of cursor.limits) assert.equal(rendered.includes(line), false);
+  for (const link of cursor.official) assert.equal(rendered.includes(link.url), false);
 });
 
 test('CLI remains executable through a symlinked skill directory', (t) => {

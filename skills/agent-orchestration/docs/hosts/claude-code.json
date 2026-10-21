@@ -1,0 +1,47 @@
+{
+  "title": "Claude Code",
+  "checked": "2026-10-08",
+  "official": [
+    {
+      "title": "Claude Code subagents",
+      "url": "https://code.claude.com/docs/en/sub-agents"
+    },
+    {
+      "title": "settings",
+      "url": "https://code.claude.com/docs/en/settings"
+    },
+    {
+      "title": "Z.ai Claude Code integration",
+      "url": "https://docs.z.ai/devpack/tool/claude"
+    }
+  ],
+  "limits": [
+    "This host includes Claude Code running another backend, such as GLM. Endpoints, credentials, and model aliases stay in Claude Code.",
+    "A tool list constrains exposed operations. It is not OS isolation. This skill does not set bypassPermissions or change host permission modes."
+  ],
+  "paths": {
+    "project_dir": ".claude",
+    "user_dir": ".claude",
+    "env_home": "CLAUDE_CONFIG_DIR",
+    "agents": "agents",
+    "skill": null
+  },
+  "encode": {
+    "kind": "effort_field",
+    "strengths": ["low", "medium", "high", "xhigh", "max"]
+  },
+  "profile": {
+    "format": "markdown",
+    "model_key": "model",
+    "effort_key": "effort",
+    "body_key": null,
+    "access_key": null,
+    "readonly_key": null,
+    "tools_key": "tools",
+    "disallowed_tools": ["Agent"]
+  },
+  "tools": {
+    "allowlist": true,
+    "needs": { "web": ["WebSearch", "WebFetch"] }
+  }
+}

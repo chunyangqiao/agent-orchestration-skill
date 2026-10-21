@@ -5,8 +5,10 @@ import {
   ConfigError,
   defaultConfig,
   expandPath,
+  parseJson,
   readJson,
   render,
+  RUNTIME,
   SKILL_ROOT,
   validate,
 } from './config.mjs';
@@ -51,8 +53,7 @@ export function sourceConfigPath(file, target) {
   return configPath;
 }
 
-// newConfig carries unsaved wizard choices through the same preview/apply/check path.
-export function runBootstrap(options, write = atomicWrite, newConfig) {
+export function runBootstrap(options, write = atomicWrite) {
   for (const key of ['host', 'scope', 'config']) {
     if (!options[key]) throw new ConfigError(`--${key} is required`);
   }
@@ -61,13 +62,9 @@ export function runBootstrap(options, write = atomicWrite, newConfig) {
   const target = targetDirectory(options.host, options.scope, options.root);
   const configPath = sourceConfigPath(options.config, target);
   const info = stat(configPath);
-  if (info && newConfig)
-    throw new ConfigError('Source configuration appeared since preview. Run setup again.');
   const config = info
     ? validate(readJson(configPath))
-    : newConfig
-      ? validate(newConfig)
-      : defaultConfig(options.host, options.preset);
+    : defaultConfig(options.host, options.preset);
   if (config.host !== options.host)
     throw new ConfigError(
       `Existing config is for ${config.host}, but bootstrap selected ${options.host}.`,
@@ -79,12 +76,13 @@ export function runBootstrap(options, write = atomicWrite, newConfig) {
     source_config: {
       path: configPath,
       action: info ? 'reuse' : 'create',
-      preset: info || newConfig ? null : (options.preset ?? 'inherit'),
+      preset: info ? null : (options.preset ?? 'inherit'),
       note: info
         ? 'Existing configuration reused unchanged; --preset is not applied.'
         : 'New configuration is saved only with --apply.',
     },
     configuration: config,
+    dispatch: parseJson(files[RUNTIME]),
     static_check: { status: 'not_run' },
   };
   if (result.status === 'conflict') return { result, exitCode: 1 };

@@ -1,12 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { loadHost, loadRoles } from './docs.mjs';
 import {
-  catalog,
   ConfigError,
   expandPath,
   fields,
-  HOSTS,
   hostSetup,
   jsonText,
   MANIFEST,
@@ -25,29 +24,18 @@ export function stat(file) {
 }
 
 export function targetDirectory(host, scope, root) {
-  if (!HOSTS.includes(host)) throw new ConfigError('Unknown host');
   if (!['user', 'project'].includes(scope)) throw new ConfigError('scope must be user or project');
-  const folders = {
-    codex: '.codex',
-    'claude-code': '.claude',
-    'kimi-code': '.kimi-code',
-    cursor: '.cursor',
-  };
+  const paths = loadHost(host).paths;
   let base;
   if (scope === 'project') {
     if (!root)
       throw new ConfigError('--root is required for project scope; select the actual project root');
-    base = path.join(expandPath(root), folders[host]);
+    base = path.join(expandPath(root), paths.project_dir);
   } else {
     if (root !== undefined) throw new ConfigError('--root is only valid for project scope');
-    const env = {
-      codex: 'CODEX_HOME',
-      'claude-code': 'CLAUDE_CONFIG_DIR',
-      'kimi-code': 'KIMI_CODE_HOME',
-    }[host];
-    base = expandPath((env && process.env[env]) || `~/${folders[host]}`);
+    base = expandPath((paths.env_home && process.env[paths.env_home]) || `~/${paths.user_dir}`);
   }
-  const target = path.join(base, 'agents');
+  const target = path.join(base, paths.agents);
   if (stat(base)?.isSymbolicLink() || stat(target)?.isSymbolicLink())
     throw new ConfigError(`Refusing symlinked host/agents directory: ${target}`);
   if (stat(target) && !stat(target).isDirectory())
@@ -66,10 +54,10 @@ export function installationPlan(target, config, files) {
     if (manifest.schema_version !== 1 || manifest.host !== config.host)
       throw new ConfigError('Installation manifest version/host mismatch');
     prior = manifest.files;
-    const suffix = config.host === 'codex' ? '.toml' : '.md';
+    const suffix = loadHost(config.host).profile.format === 'toml' ? '.toml' : '.md';
     fields(
       prior,
-      [...Object.keys(catalog()).map((role) => `crew-${role}${suffix}`), RUNTIME],
+      [...Object.keys(loadRoles()).map((role) => `crew-${role}${suffix}`), RUNTIME],
       'managed files',
     );
     if (

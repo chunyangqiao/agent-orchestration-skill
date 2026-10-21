@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { runBootstrap } from '../skills/agent-orchestration/scripts/lib/bootstrap.mjs';
+import { hostIds } from '../skills/agent-orchestration/scripts/lib/docs.mjs';
 import {
   defaultConfig,
-  HOSTS,
   jsonText,
   MANIFEST,
   readJson,
@@ -25,7 +25,7 @@ function fixture(t, host = 'codex') {
   return { root, config, options, args, target: targetDirectory(host, 'project', root) };
 }
 
-for (const host of HOSTS) {
+for (const host of hostIds()) {
   test(`${host}: bootstrap previews without writes, applies, checks and repeats without changes`, (t) => {
     const f = fixture(t, host);
     const preview = JSON.parse(cli(f.root, ['bootstrap', ...f.args]).stdout);
@@ -97,7 +97,7 @@ test('custom source, unrelated profiles and host settings survive bootstrap', (t
   const source = jsonText({
     ...defaultConfig('codex'),
     max_parallel: 1,
-    roles: { reviewer: { model: 'custom', effort: 'high' } },
+    roles: { reviewer: { model: 'custom', strength: 'high' } },
   });
   fs.writeFileSync(f.config, source);
   fs.mkdirSync(f.target, { recursive: true });
@@ -204,7 +204,10 @@ test('incomplete rollback identifies remaining profiles', (t) => {
   runBootstrap({ ...f.options, apply: true });
   const changed = {
     ...defaultConfig('codex'),
-    roles: { explorer: { model: 'changed' }, reviewer: { model: 'changed' } },
+    roles: {
+      explorer: { model: 'changed', strength: 'high' },
+      reviewer: { model: 'changed', strength: 'high' },
+    },
   };
   fs.writeFileSync(f.config, jsonText(changed));
   let calls = 0;
@@ -252,7 +255,7 @@ test('post-install read errors produce diagnostics and a filesystem error exit c
   assert.ok(fs.existsSync(path.join(f.target, MANIFEST)));
 });
 
-for (const host of HOSTS) {
+for (const host of hostIds()) {
   test(`${host}: bootstrap runs from a complete isolated skill without development dependencies`, (t) => {
     const f = fixture(t, host);
     const skill = path.join(f.root, 'agent-orchestration');

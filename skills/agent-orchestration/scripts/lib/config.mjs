@@ -1,58 +1,42 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
-import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import {
+  ConfigError,
+  fields,
+  intentError,
+  jsonText,
+  loadCommon,
+  loadHost,
+  loadRoles,
+} from './docs.mjs';
 
-export const SKILL_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-export const HOSTS = ['codex', 'claude-code', 'kimi-code', 'cursor'];
+export {
+  ConfigError,
+  fields,
+  jsonText,
+  parseJson,
+  readJson,
+  readText,
+  SKILL_ROOT,
+} from './docs.mjs';
+
 export const MANIFEST = '.crew-install.json';
 export const RUNTIME = '.crew-runtime.json';
-export const EFFORTS = {
-  codex: ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
-  'claude-code': ['low', 'medium', 'high', 'xhigh', 'max'],
-};
-export class ConfigError extends Error {}
 
-// JSON.parse establishes syntax validity; this scan retains the Python reader's
-// duplicate-key and integer-token checks, including escaped property names.
-export function parseJson(text) {
-  const value = JSON.parse(text);
-  const objects = [];
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '{') objects.push(new Set());
-    else if (text[i] === '}') objects.pop();
-    else if (text[i] === '"') {
-      const start = i++;
-      while (text[i] !== '"') {
-        if (text[i] === '\\') i++;
-        i++;
-      }
-      const key = JSON.parse(text.slice(start, i + 1));
-      let next = i + 1;
-      while (/\s/.test(text[next] ?? 'x')) next++;
-      if (text[next] !== ':') continue;
-      const keys = objects.at(-1);
-      if (keys.has(key)) throw new ConfigError(`Duplicate JSON key: ${key}`);
-      keys.add(key);
-      if (objects.length === 1 && ['schema_version', 'max_parallel'].includes(key)) {
-        const token = text.slice(next + 1).match(/^\s*([^\s,}\]]+)/)?.[1];
-        if (!/^-?(0|[1-9]\d*)$/.test(token ?? '') || !Number.isSafeInteger(Number(token))) {
-          throw new ConfigError(`${key} must be a safe integer`);
-        }
-      }
-    }
-  }
-  return value;
-}
+const BASE_READ = ['Read', 'Glob', 'Grep'];
+const BASE_WRITE = ['Write', 'Edit', 'Bash'];
+const DENY_ALWAYS = ['Agent', 'AgentSwarm', 'Task'];
+const DENY_READ_ONLY = [
+  'Write',
+  'Edit',
+  'Bash',
+  'Shell',
+  'PowerShell',
+  'WriteFile',
+  'StrReplaceFile',
+];
+const TOOL_NAME = /^(?:[A-Za-z0-9_-]+|mcp__[A-Za-z0-9_*?-]+)$/;
 
-export function readText(file) {
-  return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(fs.readFileSync(file));
-}
-export const readJson = (file) => parseJson(readText(file));
-export const jsonText = (value) => JSON.stringify(value, null, 2) + '\n';
-export const catalog = () => readJson(path.join(SKILL_ROOT, 'assets/roles.json'));
-export const presets = () => readJson(path.join(SKILL_ROOT, 'assets/presets.json'));
-export const kimiModels = () => readJson(path.join(SKILL_ROOT, 'assets/kimi-models.json'));
 export const expandPath = (value) =>
   path.resolve(
     value === '~'
@@ -62,186 +46,186 @@ export const expandPath = (value) =>
         : value,
   );
 
-export function fields(value, allowed, label) {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new ConfigError(`${label} must be an object`);
+function checkTools(role, access, items) {
+  if (!Array.isArray(items) || items.some((item) => typeof item !== 'string' || !item)) {
+    throw new ConfigError(`${role}.tools must be an array of non-empty strings`);
   }
-  const unknown = Object.keys(value).filter((key) => !allowed.includes(key));
-  if (unknown.length)
-    throw new ConfigError(`Unknown ${label} fields: ${unknown.sort().join(', ')}`);
+  if (new Set(items).size !== items.length) throw new ConfigError(`Duplicate tools in ${role}`);
+  const forbidden = [...DENY_ALWAYS];
+  if (access === 'read-only') forbidden.push(...DENY_READ_ONLY);
+  for (const tool of items) {
+    if (forbidden.includes(tool) || tool.trim() !== tool || !TOOL_NAME.test(tool)) {
+      throw new ConfigError(`Unsupported tool for ${role}: ${tool}`);
+    }
+  }
 }
 
 export function validate(config) {
   fields(config, ['schema_version', 'host', 'max_parallel', 'roles'], 'configuration');
-  if (config.schema_version !== 1) throw new ConfigError('schema_version must be 1');
-  const { host, max_parallel: limit, roles } = config;
-  if (!HOSTS.includes(host)) throw new ConfigError(`host must be one of ${HOSTS.join(', ')}`);
-  if (!Number.isSafeInteger(limit) || limit < 1)
+  if (config.schema_version !== 2) throw new ConfigError('schema_version must be 2');
+  const host = loadHost(config.host);
+  const roles = loadRoles();
+  const { max_parallel: limit } = config;
+  if (!Number.isSafeInteger(limit) || limit < 1) {
     throw new ConfigError('max_parallel must be a positive safe integer');
-  const known = catalog();
-  fields(roles, Object.keys(known), 'roles');
-  for (const [role, options] of Object.entries(roles)) {
-    fields(options, ['model', 'effort', 'tools'], role);
-    const model = Object.hasOwn(options, 'model') ? options.model : 'inherit';
-    if (
-      typeof model !== 'string' ||
-      !model.trim() ||
-      /[\p{C}\p{Z}]/u.test(model.replaceAll(' ', ''))
-    ) {
-      throw new ConfigError(`${role}.model must be a non-empty single-line printable string`);
-    }
-    if (Object.hasOwn(options, 'effort')) {
-      if (host === 'kimi-code')
-        throw new ConfigError(
-          'Kimi effort is selected through host model-pool variants; configure a model alias instead',
-        );
-      if (host === 'cursor')
-        throw new ConfigError('Cursor effort belongs in the model string; see the Cursor adapter');
-      if (!EFFORTS[host].includes(options.effort))
-        throw new ConfigError(`Unsupported ${host} effort for ${role}`);
-    }
+  }
+  fields(config.roles, Object.keys(roles), 'roles');
+  for (const [id, options] of Object.entries(config.roles)) {
+    fields(options, ['model', 'strength', 'tools'], id);
     if (Object.hasOwn(options, 'tools')) {
-      if (host === 'codex')
+      if (!host.tools.allowlist) {
         throw new ConfigError(
-          'Codex tools allowlists are not supported by this adapter; use host configuration',
+          `${host.title} has no tool allowlist; read-only roles use readonly. See docs/hosts/${host.id}.json`,
         );
-      if (host === 'cursor')
-        throw new ConfigError(
-          'Cursor has no tool allowlist; read-only roles use readonly. See the Cursor adapter',
-        );
-      const items = options.tools;
-      if (!Array.isArray(items) || items.some((item) => typeof item !== 'string' || !item)) {
-        throw new ConfigError(`${role}.tools must be an array of non-empty strings`);
       }
-      if (new Set(items).size !== items.length) throw new ConfigError(`Duplicate tools in ${role}`);
-      const forbidden = ['Agent', 'AgentSwarm', 'Task'];
-      if (known[role].access === 'read-only')
-        forbidden.push(
-          'Write',
-          'Edit',
-          'Bash',
-          'Shell',
-          'PowerShell',
-          'WriteFile',
-          'StrReplaceFile',
-        );
-      for (const tool of items) {
-        if (
-          forbidden.includes(tool) ||
-          tool.trim() !== tool ||
-          !/^(?:[A-Za-z0-9_-]+|mcp__[A-Za-z0-9_*?-]+)$/.test(tool)
-        ) {
-          throw new ConfigError(`Unsupported tool for ${role}: ${tool}`);
-        }
-      }
+      checkTools(id, roles[id].access, options.tools);
     }
+    if (!Object.hasOwn(options, 'model')) throw new ConfigError(`${id}.model is required`);
+    intentError(host, options);
   }
   return config;
 }
 
 export function defaultConfig(host, preset = 'inherit') {
-  if (!['inherit', 'recommended'].includes(preset))
+  if (!['inherit', 'recommended'].includes(preset)) {
     throw new ConfigError(`Unknown preset: ${preset}`);
-  const recommended = presets()[host];
-  if (preset === 'recommended' && !recommended)
-    throw new ConfigError(`No recommended preset for ${host}; use inherit or customize roles`);
-  return validate({
-    schema_version: 1,
-    host,
-    max_parallel: 3,
-    roles:
-      preset === 'recommended'
-        ? recommended
-        : Object.fromEntries(Object.keys(catalog()).map((role) => [role, { model: 'inherit' }])),
-  });
+  }
+  const loaded = loadHost(host);
+  const roles = Object.fromEntries(
+    Object.keys(loadRoles()).map((id) => [id, { model: 'inherit' }]),
+  );
+  if (preset === 'recommended') {
+    if (!loaded.recommended) {
+      throw new ConfigError(`No recommended preset for ${host}; use inherit or customize roles`);
+    }
+    for (const [id, intent] of Object.entries(loaded.recommended)) roles[id] = { ...intent };
+  }
+  return validate({ schema_version: 2, host, max_parallel: 3, roles });
 }
 
-function defaultTools(host, role, access) {
-  const tools = ['Read', 'Glob', 'Grep'];
-  if (access === 'workspace-write') tools.push('Write', 'Edit', 'Bash');
-  if (role === 'docs-researcher')
-    tools.push('WebSearch', host === 'claude-code' ? 'WebFetch' : 'FetchURL');
+function defaultTools(host, role) {
+  const tools = [...BASE_READ];
+  if (role.access === 'workspace-write') tools.push(...BASE_WRITE);
+  for (const token of role.needs) tools.push(...host.tools.needs[token]);
   return tools;
 }
 
-// Match the legacy JSON flow-array spacing to keep old installations unchanged.
+// Match the legacy JSON flow-array spacing to keep generated arrays stable.
 const flow = (value) =>
   Array.isArray(value) ? `[${value.map(flow).join(', ')}]` : JSON.stringify(value);
 
+function bracket(model, pairs) {
+  if (!pairs.length) return model;
+  const body = pairs
+    .map(([key, value]) => `${key}=${value === true ? 'true' : value === false ? 'false' : value}`)
+    .join(',');
+  return `${model}[${body}]`;
+}
+
+function encode(host, intent) {
+  const model = intent.model === undefined ? 'inherit' : intent.model;
+  if (model === 'inherit') return { pinned_model: null, pinned_effort: null, spawn: null };
+  if (host.encode.kind === 'effort_field') {
+    return { pinned_model: model, pinned_effort: intent.strength, spawn: null };
+  }
+  if (host.encode.kind === 'model_suffix') {
+    const family = host.encode.families[model];
+    const pairs = [];
+    if (family?.wire) pairs.push([family.wire, intent.strength]);
+    if (family?.fixed) {
+      for (const [key, value] of Object.entries(family.fixed)) pairs.push([key, value]);
+    }
+    return { pinned_model: bracket(model, pairs), pinned_effort: null, spawn: null };
+  }
+  return {
+    pinned_model: null,
+    pinned_effort: null,
+    spawn: host.encode.models[model].aliases[intent.strength],
+  };
+}
+
+function writeProfile(host, role, prompt, emit, tools) {
+  const profile = host.profile;
+  const values = { name: `crew-${role.id}`, description: role.description };
+  if (profile.access_key) values[profile.access_key] = role.access;
+  if (profile.tools_key) values[profile.tools_key] = tools;
+  // Claude reads disallowedTools. The host file stores the denied names.
+  if (profile.disallowed_tools) values.disallowedTools = profile.disallowed_tools;
+  if (Object.hasOwn(profile, 'subagents')) values.subagents = profile.subagents;
+  if (profile.model_key && emit.pinned_model !== null)
+    values[profile.model_key] = emit.pinned_model;
+  if (profile.effort_key && emit.pinned_effort !== null) {
+    values[profile.effort_key] = emit.pinned_effort;
+  }
+  if (profile.readonly_key && role.access === 'read-only') values[profile.readonly_key] = true;
+  if (profile.format === 'toml') {
+    if (profile.body_key) values[profile.body_key] = prompt;
+    return Object.entries(values)
+      .map(([key, value]) => `${key} = ${flow(value)}\n`)
+      .join('');
+  }
+  const header = Object.entries(values)
+    .map(([key, value]) => `${key}: ${flow(value)}\n`)
+    .join('');
+  return `---\n${header}---\n\n${prompt}`;
+}
+
 export function render(config) {
   validate(config);
-  const { host } = config;
-  const common = readText(path.join(SKILL_ROOT, 'assets/roles/common.md')).trim();
+  const host = loadHost(config.host);
+  const roles = loadRoles();
+  const common = loadCommon();
   const files = {};
-  for (const [role, definition] of Object.entries(catalog())) {
-    if (!Object.hasOwn(config.roles, role)) continue;
-    const options = config.roles[role];
-    const name = `crew-${role}`;
-    const body = readText(path.join(SKILL_ROOT, `assets/roles/${role}.md`)).trim();
-    const prompt = `${body}\n\n${common}\n`;
-    const model = options.model ?? 'inherit';
-    const values = { name, description: definition.description };
-    if (host === 'codex') {
-      values.sandbox_mode = definition.access;
-      if (model !== 'inherit') values.model = model;
-      if (options.effort !== undefined) values.model_reasoning_effort = options.effort;
-      values.developer_instructions = prompt;
-      files[`${name}.toml`] = Object.entries(values)
-        .map(([key, value]) => `${key} = ${flow(value)}\n`)
-        .join('');
-    } else if (host === 'cursor') {
-      if (model !== 'inherit') values.model = model;
-      if (definition.access === 'read-only') values.readonly = true;
-      const header = Object.entries(values)
-        .map(([key, value]) => `${key}: ${flow(value)}\n`)
-        .join('');
-      files[`${name}.md`] = `---\n${header}---\n\n${prompt}`;
-    } else {
-      values.tools = options.tools ?? defaultTools(host, role, definition.access);
-      if (host === 'claude-code') {
-        values.disallowedTools = ['Agent'];
-        if (model !== 'inherit') values.model = model;
-        if (options.effort !== undefined) values.effort = options.effort;
-      } else values.subagents = [];
-      const header = Object.entries(values)
-        .map(([key, value]) => `${key}: ${flow(value)}\n`)
-        .join('');
-      files[`${name}.md`] = `---\n${header}---\n\n${prompt}`;
-    }
+  const card = {
+    document: 'dispatch',
+    schema_version: 2,
+    host: config.host,
+    max_parallel: config.max_parallel,
+    roles: {},
+  };
+  const extension = host.profile.format === 'toml' ? '.toml' : '.md';
+  for (const [id, intent] of Object.entries(config.roles)) {
+    const role = roles[id];
+    const emit = encode(host, intent);
+    card.roles[id] = emit;
+    const prompt = `${role.duty.trim()}\n\nAccess: ${role.access}.\n\n${common.trim()}\n`;
+    const tools = host.profile.tools_key ? (intent.tools ?? defaultTools(host, role)) : null;
+    files[`crew-${id}${extension}`] = writeProfile(host, role, prompt, emit, tools);
   }
-  files[RUNTIME] = jsonText(config);
+  files[RUNTIME] = jsonText(card);
   return files;
 }
 
 export function hostSetup(config) {
-  if (config.host !== 'kimi-code') return undefined;
-  const models = kimiModels();
-  const used = new Set(Object.values(config.roles).map((role) => role.model));
-  const aliases = Object.keys(models).filter((alias) => used.has(alias));
-  if (!aliases.length) return undefined;
+  const host = loadHost(config.host);
+  if (host.encode.kind !== 'pool_alias') return undefined;
+  const seen = new Map();
+  for (const intent of Object.values(config.roles)) {
+    const emit = encode(host, intent);
+    if (!emit.spawn || seen.has(emit.spawn)) continue;
+    seen.set(emit.spawn, { pool: host.encode.models[intent.model], strength: intent.strength });
+  }
+  if (!seen.size) return undefined;
+  const aliases = [...seen.keys()];
   const blocks = aliases.map((alias) => {
-    const model = models[alias];
-    return `[models.${flow(alias)}]\nprovider = "managed:kimi-code"\nmodel = ${flow(model.model)}\nmax_context_size = ${model.max_context_size}\ncapabilities = ${flow(model.capabilities)}\nsupport_efforts = ["low", "high", "max"]\n\n[models.${flow(alias)}.overrides]\ndefault_effort = ${flow(model.effort)}\n`;
+    const { pool, strength } = seen.get(alias);
+    return `[models.${flow(alias)}]\nprovider = "managed:kimi-code"\nmodel = ${flow(pool.api_model)}\nmax_context_size = ${pool.max_context_size}\ncapabilities = ${flow(pool.capabilities)}\nsupport_efforts = ${flow(pool.support_efforts)}\n\n[models.${flow(alias)}.overrides]\ndefault_effort = ${flow(strength)}\n`;
   });
   blocks.push(
     `[secondary_model]\ndefault_model = ${flow(aliases[0])}\n\n[secondary_model.models]\n` +
       aliases
-        .map(
-          (alias) =>
-            `${flow(alias)} = ${flow(`${models[alias].model} / ${models[alias].effort}`)}\n`,
-        )
+        .map((alias) => {
+          const { pool, strength } = seen.get(alias);
+          return `${flow(alias)} = ${flow(`${pool.api_model} / ${strength}`)}\n`;
+        })
         .join(''),
   );
+  const home =
+    (host.paths.env_home && process.env[host.paths.env_home]) || `~/${host.paths.user_dir}`;
   return {
-    path: path.join(expandPath(process.env.KIMI_CODE_HOME || '~/.kimi-code'), 'config.toml'),
+    path: path.join(expandPath(home), 'config.toml'),
     format: 'toml',
     content: blocks.join('\n'),
-    instructions: [
-      'Log in to Kimi Code first and confirm your account can use the selected models.',
-      'Manually merge these model entries and pool keys into existing tables; do not append duplicate TOML tables or replace unrelated pool entries. Keep an existing valid default_model when merging.',
-      'Keep Thinking enabled. secondary_model.force must be false or absent; omit secondary_model.default_effort so each model variant can select its own effort.',
-      'Check complete model metadata, capabilities, support_efforts and effective default_effort in your installed Kimi version. Adjust context limits to account availability.',
-      'Agent Orchestration does not edit this file or verify host readiness. In a fresh session verify aliases, actual model/effort, tools and results before dispatch.',
-    ],
+    instructions: host.setup_instructions,
   };
 }

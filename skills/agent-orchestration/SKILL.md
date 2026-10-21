@@ -20,39 +20,36 @@ Before reporting completion of an explicitly invoked task, collect the child's r
 
 ## Installation requests
 
-For an installation or setup request, follow [AI-driven installation](references/configuration.md#ai-driven-installation) through verified skill deployment, non-interactive profile installation, independent static checks, and a live role probe. Collect unresolved choices together, then complete authorized steps without asking again. Use the guide's completion evidence before ending the task; leave blocked runtime verification explicitly pending with a precise next step. Establish missing profiles before dispatch; a real verification child can fulfill explicit invocation's delegation requirement. The AI-driven path completes configuration in the conversation without handing the user a terminal wizard.
+For an installation or setup request, deploy the skill and write profiles from the conversation. A complete request includes both, unless the user only asked to copy the skill. During ordinary work, report a missing installation and do not change it.
+
+1. Identify the host from its runtime and tools. Read `docs/hosts/<host>.json` for `official`, `limits`, and `recommended`. Read `encode` only to learn which models take a `strength` and which tokens are legal. Read `docs/roles/<id>.md` for `delegate_when`, `description`, and `access`. Read a role's duty when dispatching, not while choosing models. Require Node.js 22 or newer.
+2. Ask once for anything still unresolved: scope, source path, enabled roles, `max_parallel`, and each enabled role's model and thinking strength. Offer all seven roles, three active children, and `inherit` as the default. Offer `recommended` when that host file has it. Reuse choices the user already made.
+3. Write a schema 2 source file outside the skill directory and outside the managed agents directory. Use `~/.config/crew/<host>.json` for user scope and `<project>/.crew/<host>.json` for project scope. Each role is `{ "model": "<bare id or inherit>", "strength": "<token>" }`. `inherit` has no `strength`. Do not write brackets, wire keys, alias names, or an `effort` field. On a pool host, `model` is the API id and `strength` selects the alias.
+4. Deploy this directory as `agent-orchestration`, including `docs/`, scripts, references, metadata, and the license. From another directory, run the installed `scripts/configure.mjs`.
+5. Run `bootstrap` with `--host`, `--scope`, `--config`, and `--root` when the scope is project. Preview without `--apply`, then run it again with `--apply`. Require exit code 0, status `applied`, and `static_check.status` `passed`. One conflict writes nothing. When the result includes `host_setup`, show it and leave the host config file for the person to merge.
+6. Run `check` with the same config, scope, and root. Require exit code 0 and status `current`. Then run one live read-only probe with an enabled `crew-*` profile, as described in [evaluation](references/evaluation.md). `runtime_verified` stays false until that probe returns. Report skill deployment, the static check, and the live probe as separate results.
+
+Project scope wins over user scope. Do not merge the two.
 
 ## Select the environment
 
-1. Identify the **host** from its runtime and exposed tools, independently of the model provider. Claude Code running GLM still uses the Claude Code adapter. Model names alone do not identify a host.
-2. Read only the matching adapter: [Codex](references/hosts/codex.md), [Claude Code](references/hosts/claude-code.md), [Kimi Code](references/hosts/kimi-code.md), or [Cursor](references/hosts/cursor.md). Use its installed `.crew-runtime.json` and verify the named profiles are available through the live host. Project installation takes precedence over user installation; use one complete Agent Orchestration configuration, without merging scopes.
-3. For customization, configuration conflicts, or missing profiles, read [configuration](references/configuration.md). During ordinary task execution, report missing configuration and the next setup step; install only when the user has requested setup. Model authentication remains in the host.
-4. If the host cannot create real subagents, a required profile is unavailable, or a model/tool choice cannot be honored, explain the limitation and keep the affected work in the main conversation. Do not describe sequential role-playing as parallel or independent review. A future host needs an explicit adapter and verification before being claimed as supported.
+1. Identify the **host** from its runtime and exposed tools, independently of the model provider. Claude Code running GLM still uses the Claude Code host file. Model names alone do not identify a host.
+2. Read `docs/hosts/<host>.json` and the installed `.crew-runtime.json`. Confirm the named `crew-*` profiles through the live host. Project installation takes precedence over user installation. Use one complete configuration.
+3. For a missing profile, follow Installation requests when the user asked for setup. During ordinary task execution, report the next step and do not install. Model authentication remains in the host.
+4. If the host cannot create real subagents, a required profile is unavailable, or a model or tool choice cannot be honored, explain the limitation and keep the affected work in the main conversation. Do not describe sequential role-playing as parallel or independent review. A future host needs a `docs/hosts/<host>.json` file and a live probe before being claimed as supported.
 
 When delegating, briefly announce Agent Orchestration in the user's language and state the child's assignment and the main agent's responsibility.
 
-## Route by responsibility
+## Choose a role
 
-The enabled roles come from the user's configuration. Model choice is independent of role; `inherit` uses the host's normal subagent defaults. No model family or reasoning level is a universal role requirement.
-
-| Role / native profile | Delegate when | Role instructions |
-| --- | --- | --- |
-| `explorer` / `crew-explorer` | Local code, interfaces, or runtime evidence need focused discovery | [Explorer](assets/roles/explorer.md) |
-| `docs-researcher` / `crew-docs-researcher` | External or version-sensitive facts need primary sources | [Docs researcher](assets/roles/docs-researcher.md) |
-| `browser-debugger` / `crew-browser-debugger` | A UI failure needs reproduction and browser evidence before a fix | [Browser debugger](assets/roles/browser-debugger.md) |
-| `executor` / `crew-executor` | A localized change has settled decisions and concrete checks | [Executor](assets/roles/executor.md) |
-| `ui-styler` / `crew-ui-styler` | A specified local visual change has a known route and browser checks | [UI styler](assets/roles/ui-styler.md) |
-| `implementer` / `crew-implementer` | One cohesive multi-file change has resolved architecture and invariants | [Implementer](assets/roles/implementer.md) |
-| `reviewer` / `crew-reviewer` | A concrete residual risk needs fresh independent judgment | [Reviewer](assets/roles/reviewer.md) |
-
-Generated profiles combine the selected role with [shared child instructions](assets/roles/common.md). Disabled roles stay in the main conversation. Roles need not use different models. Resolve ambiguous product, editorial, architecture, permission, and acceptance decisions in the main conversation before delegating implementation.
+The enabled roles are the keys of the source configuration. Read `delegate_when` in `docs/roles/<id>.md` before choosing. Read that role's duty when writing the brief. A role whose `model` is `inherit` keeps the host's normal subagent default. Disabled roles stay in the main conversation. Roles may share a model. Resolve ambiguous product, editorial, architecture, permission, and acceptance decisions in the main conversation before delegating implementation.
 
 ## Dispatch and coordinate
 
 1. State the intended result, allowed changes, protected behavior, and acceptance checks.
 2. Split only independently verifiable work. Assign one writer to each file, shared artifact, browser session, or mutable-system boundary. Coupled changes belong to one writer.
 3. Provide a self-contained brief with **Outcome**, **Benefit**, **Sources**, **Scope** (including ownership and external-action authority), **Checks**, **Stop when**, and **Return**. Include applicable workspace instructions the child may not inherit. Pass only the context needed for the assigned work.
-4. Select the explicit `crew-*` profile and apply the adapter's model-selection rules. Keep at most `max_parallel` active Agent Orchestration children, excluding the main agent, and obey any lower host limit. This is a coordinator rule; a configuration file alone does not create a scheduler or enforce an OS limit.
+4. Select the explicit `crew-*` profile. Read that role in the installed `.crew-runtime.json` dispatch card. Pass `spawn` as the host model argument when it is a string, and omit the model argument when `spawn` is null. When `spawn` is null, the task card should match `pinned_model` and `pinned_effort`. When `spawn` is a string, the task card should show that string. Keep at most `max_parallel` active Agent Orchestration children, excluding the main agent, and obey any lower host limit. This is a coordinator rule. A configuration file alone does not create a scheduler or enforce an OS limit.
 5. Keep delegation one level deep: only the main agent dispatches. Prefer fresh context; use a new independent context for review. Reuse an agent for the same workstream only when its role, model, tools, and context remain appropriate.
 6. Collect results using the host's completion or wait mechanism. Inspect returned sources, artifacts, changes, and verification evidence before accepting them. Integrate and run the checks required for final acceptance.
 

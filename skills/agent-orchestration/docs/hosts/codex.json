@@ -1,0 +1,45 @@
+{
+  "title": "Codex",
+  "checked": "2026-10-08",
+  "official": [
+    {
+      "title": "OpenAI Subagents",
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/subagents#custom-agents"
+    }
+  ],
+  "limits": [
+    "Project installation replaces user installation as a whole. A project profile can shadow a user profile of the same name.",
+    "The sandbox field records intent. It is not proof of the effective child boundary.",
+    "A project-scope probe needs a trusted project. A fresh temporary directory can disable the project configuration layer."
+  ],
+  "paths": {
+    "project_dir": ".codex",
+    "user_dir": ".codex",
+    "env_home": "CODEX_HOME",
+    "agents": "agents",
+    "skill": null
+  },
+  "encode": {
+    "kind": "effort_field",
+    "strengths": ["minimal", "low", "medium", "high", "xhigh", "max"]
+  },
+  "profile": {
+    "format": "toml",
+    "model_key": "model",
+    "effort_key": "model_reasoning_effort",
+    "body_key": "developer_instructions",
+    "access_key": "sandbox_mode",
+    "readonly_key": null,
+    "tools_key": null
+  },
+  "tools": { "allowlist": false, "needs": {} },
+  "recommended": {
+    "explorer": { "model": "gpt-6-luna", "strength": "high" },
+    "docs-researcher": { "model": "gpt-6-luna", "strength": "high" },
+    "browser-debugger": { "model": "gpt-6.1-sol", "strength": "high" },
+    "executor": { "model": "gpt-6-luna", "strength": "high" },
+    "ui-styler": { "model": "gpt-6.1-sol", "strength": "medium" },
+    "implementer": { "model": "gpt-6.1-sol", "strength": "high" },
+    "reviewer": { "model": "gpt-6-astra", "strength": "high" }
+  }
+}

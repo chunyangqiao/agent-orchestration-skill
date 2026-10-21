@@ -1,0 +1,95 @@
+{
+  "title": "Kimi Code",
+  "checked": "2026-10-09",
+  "official": [
+    {
+      "title": "Models",
+      "url": "https://www.kimi.com/code/docs/kimi-code/models.html"
+    },
+    {
+      "title": "Agents",
+      "url": "https://www.kimi.com/code/docs/kimi-code-cli/customization/agents.html"
+    },
+    {
+      "title": "secondary model configuration",
+      "url": "https://www.kimi.com/code/docs/kimi-code-cli/configuration/config-files.html#secondary_model"
+    },
+    {
+      "title": "tool interface",
+      "url": "https://www.kimi.com/code/docs/kimi-code-cli/reference/tools.html"
+    }
+  ],
+  "limits": ["Markdown agents only. Older YAML kimi-cli agent files are a different format."],
+  "paths": {
+    "project_dir": ".kimi-code",
+    "user_dir": ".kimi-code",
+    "env_home": "KIMI_CODE_HOME",
+    "agents": "agents",
+    "skill": null
+  },
+  "encode": {
+    "kind": "pool_alias",
+    "models": {
+      "kimi-for-coding": {
+        "api_model": "kimi-for-coding",
+        "max_context_size": 1048576,
+        "capabilities": [
+          "thinking",
+          "always_thinking",
+          "image_in",
+          "video_in",
+          "tool_use",
+          "dynamically_loaded_tools"
+        ],
+        "support_efforts": ["low", "high", "max"],
+        "aliases": {
+          "low": "crew-kimi-coding-low",
+          "high": "crew-kimi-coding-high"
+        }
+      },
+      "k3-256k": {
+        "api_model": "k3-256k",
+        "max_context_size": 262144,
+        "capabilities": [
+          "thinking",
+          "always_thinking",
+          "image_in",
+          "tool_use",
+          "dynamically_loaded_tools"
+        ],
+        "support_efforts": ["low", "high", "max"],
+        "aliases": { "high": "crew-kimi-k3-high" }
+      }
+    }
+  },
+  "profile": {
+    "format": "markdown",
+    "model_key": null,
+    "effort_key": null,
+    "body_key": null,
+    "access_key": null,
+    "readonly_key": null,
+    "tools_key": "tools",
+    "subagents": []
+  },
+  "tools": {
+    "allowlist": true,
+    "needs": { "web": ["WebSearch", "FetchURL"] }
+  },
+  "recommended": {
+    "explorer": { "model": "kimi-for-coding", "strength": "low" },
+    "docs-researcher": { "model": "kimi-for-coding", "strength": "high" },
+    "browser-debugger": { "model": "kimi-for-coding", "strength": "high" },
+    "executor": { "model": "kimi-for-coding", "strength": "low" },
+    "ui-styler": { "model": "kimi-for-coding", "strength": "high" },
+    "implementer": { "model": "k3-256k", "strength": "high" },
+    "reviewer": { "model": "k3-256k", "strength": "high" }
+  },
+  "setup_instructions": [
+    "Log in to Kimi Code first and confirm your account can use the selected models.",
+    "Manually merge these model entries and pool keys into existing tables; do not append duplicate TOML tables or replace unrelated pool entries. Keep an existing valid default_model when merging.",
+    "Keep Thinking enabled. secondary_model.force must be false or absent; omit secondary_model.default_effort so each model variant can select its own effort.",
+    "Check complete model metadata, capabilities, support_efforts and effective default_effort in your installed Kimi version. Adjust context limits to account availability.",
+    "Agent Orchestration does not edit this file or verify host readiness. In a fresh session verify aliases, actual model/effort, tools and results before dispatch."
+  ]
+}

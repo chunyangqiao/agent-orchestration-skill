@@ -11,41 +11,40 @@ export function assertNodeVersion(version = process.versions.node) {
   }
 }
 
-const HELP = `Agent Orchestration profile configuration — Node.js 22+, dependencies bundled.
+function helpText(hosts) {
+  return `Agent Orchestration profile configuration — Node.js 22+.
 
 Examples below run from the installed skill directory.
 From the repository root, use pnpm run configure <command> or
 node skills/agent-orchestration/scripts/configure.mjs <command>.
 From another directory, use the absolute path to scripts/configure.mjs.
 
-  node scripts/configure.mjs setup [--host HOST] [--scope user|project] [--root PATH] [--config FILE]
   node scripts/configure.mjs bootstrap --host HOST --scope user|project --config FILE [--root PATH] [--preset inherit|recommended] [--apply]
   node scripts/configure.mjs init --host HOST --config FILE [--preset inherit|recommended]
   node scripts/configure.mjs render --config FILE
   node scripts/configure.mjs install --config FILE --scope user|project [--root PATH] [--apply]
   node scripts/configure.mjs check --config FILE --scope user|project [--root PATH]
 
-Hosts: codex, claude-code, kimi-code, cursor. Project scope requires --root.
-init refuses existing files; inherit is the default preset. No Claude recommended preset.
-Cursor speed and reasoning belong in the model string; see the Cursor adapter.
-setup uses an Inquirer terminal wizard; scripts/setup.mjs is its executable shortcut.
-Agents collect choices in conversation and complete bootstrap, without a terminal wizard.
-install previews by default; --apply writes profiles. Kimi model-pool setup stays manual.
-bootstrap previews without writes; --apply saves new config, installs and checks profiles.
-Existing bootstrap configs are reused unchanged; preset applies only to new configs.
+Hosts: ${hosts.join(', ')}. Project scope requires --root.
+init refuses existing files. inherit is the default preset.
+A recommended preset exists only when that host file has one.
+Agents collect model and thinking-strength choices in conversation, then run bootstrap.
+install previews by default. --apply writes profiles. Kimi model-pool setup stays manual.
+bootstrap previews without writes. --apply saves a new config, installs, and checks profiles.
+Existing bootstrap configs are reused unchanged. A preset applies only to a new config.
 Static checks do not verify live host loading or subagent execution.
-Exit codes: 0 success/cancel, 1 conflict or non-current check, 2 invalid input/filesystem error.
+Exit codes: 0 success, 1 conflict or non-current check, 2 invalid input or filesystem error.
 `;
+}
 
 export async function main(argv = process.argv.slice(2)) {
-  let io;
   try {
     assertNodeVersion();
+    const { hostIds } = await import('./lib/docs.mjs');
     const {
       ConfigError,
       defaultConfig,
       expandPath,
-      HOSTS,
       hostSetup,
       jsonText,
       readJson,
@@ -69,8 +68,9 @@ export async function main(argv = process.argv.slice(2)) {
       },
     });
     const options = parsed.values;
+    const hosts = hostIds();
     if (options.help) {
-      process.stdout.write(HELP);
+      process.stdout.write(helpText(hosts));
       return 0;
     }
     const [command] = parsed.positionals;
@@ -80,26 +80,19 @@ export async function main(argv = process.argv.slice(2)) {
       render: ['config'],
       install: ['config', 'scope', 'root', 'apply'],
       check: ['config', 'scope', 'root'],
-      setup: ['host', 'config', 'scope', 'root'],
     };
     if (!Object.hasOwn(allowed, command ?? '') || parsed.positionals.length !== 1)
       throw new ConfigError(
-        'Expected one command: init, render, install, check, setup or bootstrap. Use --help.',
+        'Expected one command: init, render, install, check, or bootstrap. Use --help.',
       );
     for (const key of Object.keys(options)) {
       if (!allowed[command].includes(key))
         throw new ConfigError(`--${key} is not valid for ${command}`);
     }
-    if (options.host !== undefined && !HOSTS.includes(options.host))
-      throw new ConfigError(`--host must be one of ${HOSTS.join(', ')}`);
+    if (options.host !== undefined && !hosts.includes(options.host))
+      throw new ConfigError(`--host must be one of ${hosts.join(', ')}`);
     if (options.scope !== undefined && !['user', 'project'].includes(options.scope))
       throw new ConfigError('--scope must be user or project');
-    if (command === 'setup') {
-      const { runSetup } = await import('./lib/setup.mjs');
-      const { terminalPrompter } = await import('./lib/prompts.mjs');
-      io = terminalPrompter();
-      return await runSetup(options, io);
-    }
     if (!options.config) throw new ConfigError('--config is required');
     if (command === 'bootstrap') {
       const { runBootstrap } = await import('./lib/bootstrap.mjs');
@@ -134,14 +127,8 @@ export async function main(argv = process.argv.slice(2)) {
     process.stdout.write(jsonText(result));
     return conflict || (command === 'check' && result.status !== 'current') ? 1 : 0;
   } catch (error) {
-    if (error.name === 'SetupCancelled') {
-      process.stdout.write('Cancelled. No files were written.\n');
-      return 0;
-    }
     process.stderr.write(`agent-orchestration: ${error.message}\n`);
     return 2;
-  } finally {
-    io?.close();
   }
 }
 
