@@ -52,6 +52,8 @@ Read [evaluation](skills/agent-orchestration/references/evaluation.md) for adapt
 
 Use short, imperative commit summaries, optionally prefixed with `feat:`, `fix:`, or `docs:`.
 
+When committing, do not add any co-author attribution, and do not reveal the identity of the agent in commit messages, PR descriptions, or any explanatory text.
+
 In a Git checkout, `pnpm prepare` enables the Husky pre-commit hook, which formats staged scripts with lint-staged and runs `pnpm test`.
 
 PRs should explain the behavior change, affected hosts, linked issues when applicable, test results, and runtime verification gaps. Include generated-output examples for profile changes.
