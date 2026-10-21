@@ -9,7 +9,7 @@
     { "title": "Composer 2.5", "url": "https://cursor.com/docs/models/cursor-composer-2-5" }
   ],
   "limits": [
-    "Plus and the legacy Start plan (India only) fix Grok at medium effort and standard speed, with Grok 4.7 on the 256k window. A task card that disagrees with pinned_model is a mismatch.",
+    "Plus and the legacy Start plan (India only) fix Grok at medium effort and standard speed, with Grok 4.7 on the 256k window. When spawn is a string, a task card that shows a different model argument is a mismatch. When spawn is null, a task card that disagrees with pinned_model is a mismatch.",
     "This host also loads .claude/agents/ and .codex/agents/. This skill writes only the agents directory from paths. On a name conflict, .cursor/ wins."
   ],
   "paths": {
@@ -29,7 +29,8 @@
       },
       "grok-4.6": {
         "wire": "effort",
-        "strengths": ["low", "medium", "high"]
+        "strengths": ["low", "medium", "high"],
+        "task_stem": "cursor-grok-4.6"
       },
       "grok-4.5": {
         "wire": "effort",

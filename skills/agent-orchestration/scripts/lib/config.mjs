@@ -122,26 +122,60 @@ function bracket(model, pairs) {
   return `${model}[${body}]`;
 }
 
+function suffixChoice(host, intent) {
+  const family = host.encode.families[intent.model];
+  if (!family) return { stem: intent.model, strength: null, fast: null, wire: null };
+  const fixed = family.fixed ?? {};
+  return {
+    stem: family.task_stem ?? intent.model,
+    strength: family.wire ? intent.strength : null,
+    fast: Object.hasOwn(fixed, 'fast') ? fixed.fast : null,
+    wire: family.wire ?? null,
+  };
+}
+
+function taskSlug(choice) {
+  const parts = [choice.stem];
+  if (choice.strength) parts.push(choice.strength);
+  if (choice.fast === true) parts.push('fast');
+  return parts.join('-');
+}
+
 function encode(host, intent) {
   const model = intent.model === undefined ? 'inherit' : intent.model;
-  if (model === 'inherit') return { pinned_model: null, pinned_effort: null, spawn: null };
+  if (model === 'inherit') return Object.freeze({ tag: 'inherit' });
   if (host.encode.kind === 'effort_field') {
-    return { pinned_model: model, pinned_effort: intent.strength, spawn: null };
+    return Object.freeze({ tag: 'effort_field', model, effort: intent.strength });
   }
   if (host.encode.kind === 'model_suffix') {
+    const choice = suffixChoice(host, intent);
     const family = host.encode.families[model];
     const pairs = [];
-    if (family?.wire) pairs.push([family.wire, intent.strength]);
+    if (choice.wire) pairs.push([choice.wire, choice.strength]);
     if (family?.fixed) {
       for (const [key, value] of Object.entries(family.fixed)) pairs.push([key, value]);
     }
-    return { pinned_model: bracket(model, pairs), pinned_effort: null, spawn: null };
+    return Object.freeze({
+      tag: 'model_suffix',
+      profileModel: bracket(model, pairs),
+      taskSlug: taskSlug(choice),
+    });
   }
-  return {
-    pinned_model: null,
-    pinned_effort: null,
-    spawn: host.encode.models[model].aliases[intent.strength],
-  };
+  return Object.freeze({
+    tag: 'pool_alias',
+    alias: host.encode.models[model].aliases[intent.strength],
+  });
+}
+
+function toCard(emit) {
+  if (emit.tag === 'inherit') return { pinned_model: null, pinned_effort: null, spawn: null };
+  if (emit.tag === 'effort_field') {
+    return { pinned_model: emit.model, pinned_effort: emit.effort, spawn: null };
+  }
+  if (emit.tag === 'model_suffix') {
+    return { pinned_model: emit.profileModel, pinned_effort: null, spawn: emit.taskSlug };
+  }
+  return { pinned_model: null, pinned_effort: null, spawn: emit.alias };
 }
 
 function writeProfile(host, role, prompt, emit, tools) {
@@ -149,13 +183,13 @@ function writeProfile(host, role, prompt, emit, tools) {
   const values = { name: `crew-${role.id}`, description: role.description };
   if (profile.access_key) values[profile.access_key] = role.access;
   if (profile.tools_key) values[profile.tools_key] = tools;
-  // Claude reads disallowedTools. The host file stores the denied names.
   if (profile.disallowed_tools) values.disallowedTools = profile.disallowed_tools;
   if (Object.hasOwn(profile, 'subagents')) values.subagents = profile.subagents;
-  if (profile.model_key && emit.pinned_model !== null)
-    values[profile.model_key] = emit.pinned_model;
-  if (profile.effort_key && emit.pinned_effort !== null) {
-    values[profile.effort_key] = emit.pinned_effort;
+  if (emit.tag === 'model_suffix' && profile.model_key) {
+    values[profile.model_key] = emit.profileModel;
+  } else if (emit.tag === 'effort_field') {
+    if (profile.model_key) values[profile.model_key] = emit.model;
+    if (profile.effort_key && emit.effort !== null) values[profile.effort_key] = emit.effort;
   }
   if (profile.readonly_key && role.access === 'read-only') values[profile.readonly_key] = true;
   if (profile.format === 'toml') {
@@ -187,7 +221,7 @@ export function render(config) {
   for (const [id, intent] of Object.entries(config.roles)) {
     const role = roles[id];
     const emit = encode(host, intent);
-    card.roles[id] = emit;
+    card.roles[id] = toCard(emit);
     const prompt = `${role.duty.trim()}\n\nAccess: ${role.access}.\n\n${common.trim()}\n`;
     const tools = host.profile.tools_key ? (intent.tools ?? defaultTools(host, role)) : null;
     files[`crew-${id}${extension}`] = writeProfile(host, role, prompt, emit, tools);
@@ -202,8 +236,8 @@ export function hostSetup(config) {
   const seen = new Map();
   for (const intent of Object.values(config.roles)) {
     const emit = encode(host, intent);
-    if (!emit.spawn || seen.has(emit.spawn)) continue;
-    seen.set(emit.spawn, { pool: host.encode.models[intent.model], strength: intent.strength });
+    if (emit.tag !== 'pool_alias' || seen.has(emit.alias)) continue;
+    seen.set(emit.alias, { pool: host.encode.models[intent.model], strength: intent.strength });
   }
   if (!seen.size) return undefined;
   const aliases = [...seen.keys()];

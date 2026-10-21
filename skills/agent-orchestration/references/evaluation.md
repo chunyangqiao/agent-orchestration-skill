@@ -94,7 +94,7 @@ These probes verify successful read-only explicit invocation, result integration
 
 ## Cursor live acceptance
 
-Not yet run. Static generation and installation are covered by the test suite. A passing static check does not establish that Cursor loaded `crew-*` profiles or honored a pinned model string. The next probe is a fresh session: confirm the enabled `crew-*` names are selectable, run one read-only explorer probe, and compare the task card's model with the profile. Plus and the legacy Start plan fix Grok at medium effort and standard speed; a different card model is a mismatch.
+Not yet run. Static generation and installation are covered by the test suite. A passing static check does not prove that Cursor loaded a profile. The next probe is a fresh session. Confirm the enabled `crew-*` names are selectable, run one read-only explorer probe, and compare the task card against `spawn` when `spawn` is a string, and against the profile model when `spawn` is null. Plus and the legacy Start plan fix Grok at medium effort and standard speed. If a live `crew-*` probe shows the host ignores Task `model`, drop the spawn token instead of keeping both writings.
 
 ## Compare useful outcomes
 

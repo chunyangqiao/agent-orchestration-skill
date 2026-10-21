@@ -24,7 +24,7 @@ The host runs the agents and controls their permissions. This skill provides coo
 | [Codex](skills/agent-orchestration/docs/hosts/codex.json) | TOML | Source `model` and `strength`; native fields come from the host file |
 | [Claude Code](skills/agent-orchestration/docs/hosts/claude-code.json) | Markdown with YAML frontmatter | Source `model` and `strength`; native fields come from the host file |
 | [Kimi Code](skills/agent-orchestration/docs/hosts/kimi-code.json) | Markdown with YAML frontmatter | Source API id and `strength`; the dispatch card carries the pool alias |
-| [Cursor](skills/agent-orchestration/docs/hosts/cursor.json) | Markdown with YAML frontmatter | Source model id and `strength`; the profile stores the encoded model string |
+| [Cursor](skills/agent-orchestration/docs/hosts/cursor.json) | Markdown with YAML frontmatter | Source model id and `strength`; the profile stores the encoded model string; the dispatch card's `spawn` is the Task slug |
 
 User scope writes profiles to `~/.codex/agents`, `~/.claude/agents`, `~/.kimi-code/agents`, or `~/.cursor/agents`. `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, and `KIMI_CODE_HOME` replace `~/.codex`, `~/.claude`, and `~/.kimi-code` when set. Profiles stay in the `agents` directory under the selected base. Cursor has no equivalent variable. Project scope writes `<root>/.codex/agents`, `<root>/.claude/agents`, `<root>/.kimi-code/agents`, or `<root>/.cursor/agents`. On Codex, a project installation replaces the user installation as a whole.
 

@@ -24,7 +24,7 @@
 | [Codex](skills/agent-orchestration/docs/hosts/codex.json) | TOML | 源文件写 `model` 和 `strength`，原生字段来自宿主文件 |
 | [Claude Code](skills/agent-orchestration/docs/hosts/claude-code.json) | 带 YAML frontmatter 的 Markdown | 源文件写 `model` 和 `strength`，原生字段来自宿主文件 |
 | [Kimi Code](skills/agent-orchestration/docs/hosts/kimi-code.json) | 带 YAML frontmatter 的 Markdown | 源文件写 API 模型名和 `strength`，派发卡携带模型池别名 |
-| [Cursor](skills/agent-orchestration/docs/hosts/cursor.json) | 带 YAML frontmatter 的 Markdown | 源文件写模型名和 `strength`，角色文件保存编码后的模型字符串 |
+| [Cursor](skills/agent-orchestration/docs/hosts/cursor.json) | 带 YAML frontmatter 的 Markdown | 源文件写模型名和 `strength`，角色文件保存编码后的模型字符串，派发卡的 `spawn` 是 Task slug |
 
 用户级安装把角色配置写入 `~/.codex/agents`、`~/.claude/agents`、`~/.kimi-code/agents` 或 `~/.cursor/agents`。设置了 `CODEX_HOME`、`CLAUDE_CONFIG_DIR` 或 `KIMI_CODE_HOME` 时，该变量分别替代 `~/.codex`、`~/.claude` 和 `~/.kimi-code`。角色配置仍在其下的 `agents` 目录中。Cursor 没有对应的环境变量。项目级安装写入 `<root>/.codex/agents`、`<root>/.claude/agents`、`<root>/.kimi-code/agents` 或 `<root>/.cursor/agents`。在 Codex 上，项目级安装会整体替换用户级安装。
 

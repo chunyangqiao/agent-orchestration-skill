@@ -425,20 +425,42 @@ test('Cursor recommended profiles pin model strings and readonly access', () => 
     implementer: 'grok-4.7[reasoning_effort=high]',
     reviewer: 'grok-4.7[reasoning_effort=high]',
   };
+  const spawns = {
+    explorer: 'grok-4.5-medium',
+    'docs-researcher': 'grok-4.7-high',
+    'browser-debugger': 'cursor-grok-4.6-high',
+    executor: 'composer-2.5-fast',
+    'ui-styler': 'composer-2.5-fast',
+    implementer: 'grok-4.7-high',
+    reviewer: 'grok-4.7-high',
+  };
   const files = render(config);
+  const card = JSON.parse(files[RUNTIME]);
   for (const [role, model] of Object.entries(expected)) {
     const parsed = yaml(files[`crew-${role}.md`].split('---\n')[1]);
     assert.equal(parsed.name, `crew-${role}`);
     assert.equal(parsed.model, model);
+    assert.equal(parsed.spawn, undefined);
     assert.equal(parsed.readonly, loadRoles()[role].access === 'read-only' ? true : undefined);
     assert.equal(parsed.tools, undefined);
     assert.equal(parsed.effort, undefined);
     assert.equal(parsed.is_background, undefined);
     assert.equal(parsed.subagents, undefined);
+    assert.deepEqual(card.roles[role], {
+      pinned_model: model,
+      pinned_effort: null,
+      spawn: spawns[role],
+    });
   }
-  const inherited = yaml(render(defaultConfig('cursor'))['crew-explorer.md'].split('---\n')[1]);
+  const inheritedFiles = render(defaultConfig('cursor'));
+  const inherited = yaml(inheritedFiles['crew-explorer.md'].split('---\n')[1]);
   assert.equal(inherited.model, undefined);
   assert.equal(inherited.readonly, true);
+  assert.deepEqual(JSON.parse(inheritedFiles[RUNTIME]).roles.explorer, {
+    pinned_model: null,
+    pinned_effort: null,
+    spawn: null,
+  });
   assert.throws(
     () => validate({ ...config, roles: { reviewer: { model: 'grok-4.7', effort: 'high' } } }),
     /Unknown reviewer fields: effort/,
@@ -455,7 +477,11 @@ test('Cursor recommended profiles pin model strings and readonly access', () => 
     yaml(render(pinned)['crew-reviewer.md'].split('---\n')[1]).model,
     'grok-4.7[reasoning_effort=high]',
   );
-  assert.equal(JSON.parse(render(pinned)[RUNTIME]).roles.reviewer.spawn, null);
+  assert.deepEqual(JSON.parse(render(pinned)[RUNTIME]).roles.reviewer, {
+    pinned_model: 'grok-4.7[reasoning_effort=high]',
+    pinned_effort: null,
+    spawn: 'grok-4.7-high',
+  });
   assert.throws(
     () =>
       validate({

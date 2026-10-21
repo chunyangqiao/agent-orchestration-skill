@@ -195,6 +195,17 @@ export function hostIds(root = SKILL_ROOT) {
     .sort();
 }
 
+function checkTaskStem(model, family) {
+  if (family.strengths?.includes('fast')) {
+    throw new ConfigError(`${model} strengths must not include fast`);
+  }
+  if (family.task_stem === undefined) return;
+  const stem = family.task_stem;
+  if (typeof stem !== 'string' || !BARE_MODEL.test(stem) || stem.includes('=')) {
+    throw new ConfigError(`${model} task_stem must be a bare token`);
+  }
+}
+
 function checkEncode(host, encode) {
   if (encode.kind === 'effort_field') {
     fields(encode, ['kind', 'strengths'], `${host} encode`);
@@ -214,7 +225,7 @@ function checkEncode(host, encode) {
       throw new ConfigError(`${host} families must be an object`);
     }
     for (const [model, family] of Object.entries(encode.families)) {
-      fields(family, ['wire', 'strengths', 'fixed', 'confirmed'], `${host} ${model}`);
+      fields(family, ['wire', 'strengths', 'fixed', 'confirmed', 'task_stem'], `${host} ${model}`);
       if (family.wire) {
         if (typeof family.wire !== 'string' || !KEY.test(family.wire)) {
           throw new ConfigError(`${host} ${model} wire must be a lowercase word`);
@@ -239,6 +250,7 @@ function checkEncode(host, encode) {
           }
         }
       }
+      checkTaskStem(model, family);
     }
     return;
   }
