@@ -110,10 +110,16 @@ for (const host of hostIds()) {
   });
 }
 
-for (const old of readJson(path.join(REPO_ROOT, 'tests/fixtures/python-v1.json'))) {
-  test(`Python v1 ${old.host}/${old.variant} is rejected`, () => {
-    assert.throws(() => validate(old.config), /schema_version must be 2/);
-  });
+const legacyHostDir = path.join(REPO_ROOT, 'tests/fixtures/host');
+for (const name of fs
+  .readdirSync(legacyHostDir)
+  .filter((item) => item.endsWith('.json'))
+  .sort()) {
+  for (const old of readJson(path.join(legacyHostDir, name))) {
+    test(`Python v1 ${old.host}/${old.variant} is rejected`, () => {
+      assert.throws(() => validate(old.config), /schema_version must be 2/);
+    });
+  }
 }
 
 test('init preserves existing choices and invalid input does not create directories', (t) => {
