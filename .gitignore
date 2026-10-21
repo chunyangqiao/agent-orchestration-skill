@@ -4,6 +4,7 @@ node_modules/
 
 # Personal configuration and environment overrides
 /.crew/
+/.audit/
 .env
 .env.*
 !.env.example

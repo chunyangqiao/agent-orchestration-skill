@@ -11,7 +11,7 @@
 ## 功能
 
 - 七种共享角色，为不同宿主生成原生配置。
-- 可配置启用的角色、模型、宿主支持的推理强度，以及并发指导参数。
+- 可配置启用的角色、模型、宿主支持的推理强度，以及同时运行的子智能体上限。
 - 支持由 AI 智能体在对话中完成安装，以及非交互式引导命令。
 - 支持安装预览、冲突检测和可重复更新，保留无关配置及本地修改过的托管文件。
 
@@ -26,7 +26,9 @@
 | [Kimi Code](skills/agent-orchestration/docs/hosts/kimi-code.json) | 带 YAML frontmatter 的 Markdown | 源文件写 API 模型名和 `strength`，派发卡携带模型池别名 |
 | [Cursor](skills/agent-orchestration/docs/hosts/cursor.json) | 带 YAML frontmatter 的 Markdown | 源文件写模型名和 `strength`，角色文件保存编码后的模型字符串 |
 
-Kimi 以 Markdown Agent 为目标。Cursor 把角色配置写入 `.cursor/agents/`。模型可用性、浏览器工具、权限及配置发现取决于已安装的宿主。完成配置后，请在实际会话中验证。
+用户级安装把角色配置写入 `~/.codex/agents`、`~/.claude/agents`、`~/.kimi-code/agents` 或 `~/.cursor/agents`。设置了 `CODEX_HOME`、`CLAUDE_CONFIG_DIR` 或 `KIMI_CODE_HOME` 时，该变量分别替代 `~/.codex`、`~/.claude` 和 `~/.kimi-code`。角色配置仍在其下的 `agents` 目录中。Cursor 没有对应的环境变量。项目级安装写入 `<root>/.codex/agents`、`<root>/.claude/agents`、`<root>/.kimi-code/agents` 或 `<root>/.cursor/agents`。在 Codex 上，项目级安装会整体替换用户级安装。
+
+Kimi 以 Markdown Agent 为目标。kimi-cli 的旧版 YAML Agent 文件是另一种格式。模型可用性、浏览器工具、权限及配置发现取决于已安装的宿主。完成配置后，请在实际会话中验证。
 
 ## 快速开始
 
@@ -88,8 +90,8 @@ pnpm run configure:check --config ~/.config/crew/codex.json --scope user
 
 - 其他宿主使用 `claude-code`、`kimi-code` 或 `cursor`，并分别保存独立配置。
 - 项目级安装需在 `bootstrap` 和 `check` 命令中同时使用 `--scope project --root /path/to/project`。
-- 新配置默认启用全部七种角色，最多同时运行三个子智能体，并继承宿主模型。确认模型访问权限后，可使用 `--preset recommended` 选用内置的 Codex、Kimi 或 Cursor 方案。Kimi 别名以 `host_setup` 输出，由使用者合并进宿主配置。Cursor 的钉选由 `model` 和 `strength` 编码而成，见 [docs/hosts/cursor.json](skills/agent-orchestration/docs/hosts/cursor.json)。
-- 已有配置会原样复用；`--preset` 仅在创建配置时生效。如需自定义模型、角色子集或并发数，让智能体写一份 schema 2 源文件，或自行编辑后再执行引导安装。
+- 新配置默认启用全部七种角色，将 `max_parallel` 设为 3，并把每个角色的 `model` 设为 `inherit`。`max_parallel` 只计算正在运行的子智能体，不含主智能体。确认模型访问权限后，`--preset recommended` 会选用 Codex、Kimi 和 Cursor 的内置方案。Claude Code 没有 recommended 预设。当 Kimi 角色写了模型和思考强度时，JSON 结果包含 `host_setup`，需要手动合并进宿主配置。`inherit` 不会输出 `host_setup`。Cursor 的角色文件保存编码后的模型字符串，编码规则见 [docs/hosts/cursor.json](skills/agent-orchestration/docs/hosts/cursor.json)。有些模型不接受思考强度，例如 `composer-2.5`。
+- 已有配置会原样复用；`--preset` 仅在创建配置时生效。如需自定义模型、角色子集或 `max_parallel`，让智能体写一份 schema 2 源文件，或自行编辑后再执行引导安装。
 - 预览不会创建文件或目录。`--apply` 只写入源配置和托管的角色配置。源配置应保存在技能目录及托管 Agent 目录之外。引导命令不会复制技能本身。
 - JSON 结果会标明配置是新建还是复用，以及静态检查状态。`runtime_verified: false` 表示仍需验证宿主是否实际加载并执行配置，即使静态检查已经通过。
 
